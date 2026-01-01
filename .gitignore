@@ -7,6 +7,7 @@ xcuserdata/
 
 ## Obj-C/Swift specific
 *.hmap
+.DS_Store
 
 ## App packaging
 *.ipa
@@ -30,6 +31,8 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+Package.resolved
+.swiftpm/
 
 # CocoaPods
 #
