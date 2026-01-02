@@ -5,8 +5,7 @@ public actor RequestContext {
     public let target: any APIRequest
     public let startTime: Date
 
-    public private(set) var adaptedRequest: URLRequest?
-    public private(set) var rawResponse: RawResponse?
+    public private(set) var request: URLRequest?
     public private(set) var response: APIResponse?
     public private(set) var error: Error?
     public private(set) var retryCount: Int
@@ -18,12 +17,8 @@ public actor RequestContext {
         self.retryCount = 0
     }
 
-    public func updateAdaptedRequest(_ request: URLRequest) {
-        adaptedRequest = request
-    }
-
-    public func updateRawResponse(_ response: RawResponse) {
-        rawResponse = response
+    public func updateRequest(_ request: URLRequest) {
+        self.request = request
     }
 
     public func updateResponse(_ response: APIResponse) {
@@ -43,8 +38,7 @@ public actor RequestContext {
             id: id,
             target: target,
             startTime: startTime,
-            adaptedRequest: adaptedRequest,
-            rawResponse: rawResponse,
+            request: request,
             response: response,
             error: error,
             retryCount: retryCount
@@ -55,8 +49,7 @@ public actor RequestContext {
         public let id: UUID
         public let target: any APIRequest
         public let startTime: Date
-        public let adaptedRequest: URLRequest?
-        public let rawResponse: RawResponse?
+        public let request: URLRequest?
         public let response: APIResponse?
         public let error: Error?
         public let retryCount: Int
