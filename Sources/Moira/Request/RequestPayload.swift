@@ -3,7 +3,7 @@ import Foundation
 public struct RequestPayload: Sendable {
     public enum Body: Sendable {
         case none
-        case jsonModel(any Encodable & Sendable)
+        case json(any JSONEncodable)
         case urlEncodedForm([URLQueryItem])
         case data(Data)
         case upload(UploadSource)
@@ -42,9 +42,9 @@ public struct RequestPayload: Sendable {
         return copy
     }
 
-    public func withJSON(_ body: any Encodable & Sendable) -> Self {
+    public func withJSON<T: Encodable & Sendable>(_ body: T) -> Self {
         var copy = self
-        copy.body = .jsonModel(body)
+        copy.body = .json(AnyJSONEncodable(body))
         return copy
     }
 
