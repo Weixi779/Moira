@@ -29,8 +29,33 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     }
 
     public func requestTask(_ target: any APIRequest) async throws -> RequestTask {
-        let prepared = try await runner.prepareRequest(target)
+        let pipeline = try await preparePipeline(for: target)
 
+        if let task = await tryShortCircuit(pipeline) {
+            return task
+        }
+
+        return try await execute(pipeline)
+    }
+}
+
+private extension APIProvider {
+    struct Pipeline {
+        let prepared: any APIRequest
+        let request: URLRequest
+        let context: RequestContext
+        let snapshot: RequestContext.Snapshot
+
+        var executionKind: ExecutionKind {
+            if case .upload(let source) = prepared.payload.body {
+                return .upload(source: source, request: request)
+            }
+            return .request(request)
+        }
+    }
+
+    func preparePipeline(for target: any APIRequest) async throws -> Pipeline {
+        let prepared = try await runner.prepareRequest(target)
         let built = try builder.build(prepared)
         let adapted = try await runner.adaptRequest(built)
 
@@ -40,44 +65,47 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         let snapshot = await context.snapshot()
         await runner.willSend(snapshot: snapshot)
 
-        let shortCircuit = await runner.evaluate(snapshot: snapshot)
-        if case .miss = shortCircuit {
-        } else {
-            switch shortCircuit {
-            case .hitResult(let response, _):
-                let responseClosure = { @Sendable () async throws -> APIResponse in
-                    let processed = try await self.processResponse(response, context: context)
-                    await self.notifyDidReceive(context: context)
-                    return processed
-                }
-                return RequestTask(progress: nil, response: responseClosure)
-            case .hitError(let error, _):
-                let responseClosure = { @Sendable () async throws -> APIResponse in
-                    await context.updateError(error)
-                    await self.notifyDidFail(context: context)
-                    throw error
-                }
-                return RequestTask(progress: nil, response: responseClosure)
-            case .miss:
-                break
-            }
-        }
-
-        if case .upload(let source) = prepared.payload.body {
-            return try await makeTask(
-                kind: .upload(source: source, request: adapted),
-                context: context
-            )
-        }
-
-        return makeRetryableTask(
-            kind: .request(adapted),
-            context: context
+        return Pipeline(
+            prepared: prepared,
+            request: adapted,
+            context: context,
+            snapshot: snapshot
         )
     }
-}
 
-private extension APIProvider {
+    func tryShortCircuit(_ pipeline: Pipeline) async -> RequestTask? {
+        let decision = await runner.evaluate(snapshot: pipeline.snapshot)
+        switch decision {
+        case .hitResult(let response, _):
+            let responseClosure = { @Sendable () async throws -> APIResponse in
+                let processed = try await self.processResponse(response, context: pipeline.context)
+                await self.notifyDidReceive(context: pipeline.context)
+                return processed
+            }
+            return RequestTask(progress: nil, response: responseClosure)
+        case .hitError(let error, _):
+            let responseClosure = { @Sendable () async throws -> APIResponse in
+                await pipeline.context.updateError(error)
+                await self.notifyDidFail(context: pipeline.context)
+                throw error
+            }
+            return RequestTask(progress: nil, response: responseClosure)
+        case .miss:
+            return nil
+        }
+    }
+
+    func execute(_ pipeline: Pipeline) async throws -> RequestTask {
+        switch pipeline.executionKind {
+        case .upload(let source, let request):
+            return try await makeTask(kind: .upload(source: source, request: request), context: pipeline.context)
+        case .request(let request):
+            return makeRetryableTask(kind: .request(request), context: pipeline.context)
+        case .download(let request):
+            return try await makeTask(kind: .download(request: request), context: pipeline.context)
+        }
+    }
+
     enum ExecutionKind {
         case request(URLRequest)
         case upload(source: UploadSource, request: URLRequest)
@@ -109,38 +137,47 @@ private extension APIProvider {
         context: RequestContext
     ) -> RequestTask {
         let responseClosure = { @Sendable () async throws -> APIResponse in
-            var attemptError: Error?
-
-            while true {
-                do {
-                    let task = try await self.makeClientTask(kind: kind)
-                    let response = try await task.response()
-                    let processed = try await self.processResponse(response, context: context)
-                    await self.notifyDidReceive(context: context)
-                    return processed
-                } catch {
-                    attemptError = error
-                    await context.updateError(error)
-
-                    let snapshot = await context.snapshot()
-                    let decision = await self.shouldRetry(snapshot: snapshot, error: error)
-                    switch decision {
-                    case .retry:
-                        await context.incrementRetryCount()
-                        continue
-                    case .retryAfter(let delay):
-                        await context.incrementRetryCount()
-                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                        continue
-                    case .doNotRetry:
-                        await self.notifyDidFail(context: context)
-                        throw attemptError ?? error
-                    }
-                }
-            }
+            try await self.performWithRetry(kind: kind, context: context)
         }
 
         return RequestTask(progress: nil, response: responseClosure)
+    }
+
+    func performWithRetry(
+        kind: ExecutionKind,
+        context: RequestContext
+    ) async throws -> APIResponse {
+        var attemptError: Error?
+
+        while true {
+            do {
+                let task = try await self.makeClientTask(kind: kind)
+                let response = try await task.response()
+                let processed = try await self.processResponse(response, context: context)
+                await self.notifyDidReceive(context: context)
+                return processed
+            } catch {
+                attemptError = error
+                await context.updateError(error)
+
+                let snapshot = await context.snapshot()
+                let decision = await self.shouldRetry(snapshot: snapshot, error: error)
+                switch decision {
+                case .retry:
+                    await self.runner.willRetry(snapshot: snapshot, error: error, decision: decision)
+                    await context.incrementRetryCount()
+                    continue
+                case .retryAfter(let delay):
+                    await self.runner.willRetry(snapshot: snapshot, error: error, decision: decision)
+                    await context.incrementRetryCount()
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    continue
+                case .doNotRetry:
+                    await self.notifyDidFail(context: context)
+                    throw attemptError ?? error
+                }
+            }
+        }
     }
 
     func makeTask(
