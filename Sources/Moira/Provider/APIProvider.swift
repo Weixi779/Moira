@@ -25,17 +25,26 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         decoder: ResponseDecoder
     ) async throws -> T {
         let response = try await request(target)
-        return try decoder.decode(T.self, from: response.data)
+        do {
+            return try decoder.decode(T.self, from: response.data)
+        } catch {
+            throw APIError.responseDecodingFailed(error)
+        }
     }
 
     public func requestTask(_ target: any APIRequest) async throws -> RequestTask {
-        let pipeline = try await preparePipeline(for: target)
+        do {
+            let pipeline = try await preparePipeline(for: target)
 
-        if let task = await tryShortCircuit(pipeline) {
-            return task
+            if let task = await tryShortCircuit(pipeline) {
+                return wrapTask(task)
+            }
+
+            let task = try await execute(pipeline)
+            return wrapTask(task)
+        } catch {
+            throw mapToAPIError(error)
         }
-
-        return try await execute(pipeline)
     }
 }
 
@@ -213,5 +222,24 @@ private extension APIProvider {
         case .download(let request):
             return try self.client.download(request)
         }
+    }
+
+    func wrapTask(_ task: RequestTask) -> RequestTask {
+        let responseClosure = { @Sendable () async throws -> APIResponse in
+            do {
+                return try await task.response()
+            } catch {
+                throw self.mapToAPIError(error)
+            }
+        }
+
+        return RequestTask(progress: task.progress, response: responseClosure)
+    }
+
+    func mapToAPIError(_ error: Error) -> APIError {
+        if let apiError = error as? APIError {
+            return apiError
+        }
+        return .underlying(error)
     }
 }
