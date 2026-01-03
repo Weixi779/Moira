@@ -6,6 +6,6 @@ public enum ShortCircuitDecision: Sendable {
     case hitError(Error, source: String? = nil)
 }
 
-public protocol ShortCircuitPlugin: PluginType {
+public protocol ShortCircuitPlugin: RequestPlugin {
     func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision
 }
