@@ -1,17 +1,16 @@
 # Moira
 
-Moira is a lightweight networking layer built on Swift Concurrency.
-It provides clear request descriptions, a predictable lifecycle, and pluggable behavior.
+Moira 是一个基于 Swift Concurrency 的轻量网络层，提供清晰的请求描述、可预测的生命周期以及可插拔的插件体系。
 
-## Highlights
+## 主要能力
 
-- Request description: `APIRequest` + `RequestPayload`
-- Request building: `RequestBuilder`
-- Plugins: Transform / Observer / Retry / ShortCircuit
-- Decoder injection: `ResponseDecoder`
-- Upload/download progress: `RequestTask.progress`
+- 请求描述：`APIRequest` + `RequestPayload`
+- 请求构建：`RequestBuilder`
+- 插件体系：Transform / Observer / Retry / ShortCircuit
+- 解码注入：`ResponseDecoder`
+- 上传/下载进度：`RequestTask.progress`
 
-## Quick Example
+## 快速示例
 
 ```swift
 import Moira
@@ -36,9 +35,9 @@ let user: User = try await provider.request(
 )
 ```
 
-## Docs
+## 文档
 
-English:
+英文：
 - `Docs/Getting-Started.md`
 - `Docs/Core-Types.md`
 - `Docs/Plugins.md`
@@ -46,7 +45,7 @@ English:
 - `Docs/Clients.md`
 - `Docs/Architecture.md`
 
-Chinese:
+中文：
 - `Docs/zh/Getting-Started.md`
 - `Docs/zh/Core-Types.md`
 - `Docs/zh/Plugins.md`
@@ -54,7 +53,7 @@ Chinese:
 - `Docs/zh/Clients.md`
 - `Docs/zh/Architecture.md`
 
-## Build & Test
+## 构建与测试
 
 ```bash
 swift build

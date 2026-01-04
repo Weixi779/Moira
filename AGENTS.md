@@ -6,11 +6,16 @@
 ## Structure
 - Source code: `Sources/Moira/`
 - Tests: `Tests/MoiraTests/`
-- Design notes and decisions: `docs/01.md`–`docs/07-decoder-and-shortcircuit.md`
+- Docs live in `Docs/` (English) and `Docs/zh/` (Chinese).
 
 ## Build & Test
 - `swift build`
 - `swift test`
+
+## Testing Notes
+- Tests use Swift Testing (`import Testing`).
+- Integration tests hit `https://httpbin.org` and require network access.
+- Prefer unit tests for APIProvider, RequestBuilder, and plugins when possible.
 
 ## Conventions
 - Swift tools version 5.9; minimum platforms iOS 16 / macOS 13.
@@ -18,6 +23,4 @@
 - Keep APIs small and composable; avoid large enums that block plugin evolution.
 
 ## Docs Workflow
-- Use `docs/06-issues.md` as the question pool.
-- Record confirmed decisions in `docs/07-decoder-and-shortcircuit.md`.
 - Keep docs in sync when changing public APIs.
