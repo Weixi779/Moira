@@ -58,7 +58,7 @@ struct APIProviderIntegrationTests {
         ])
         let request = SimpleRequest(path: "/get", payload: payload)
 
-        let response: GetResponse = try await provider.request(request, decoder: JSONDecoder())
+        let response: GetResponse = try await provider.request(request)
         #expect(response.args["q"] == "moira")
     }
 
@@ -69,7 +69,7 @@ struct APIProviderIntegrationTests {
         let payload = RequestPayload().withJSON(Payload(message: "hello"))
         let request = SimpleRequest(path: "/post", method: .post, payload: payload)
 
-        let response: PostResponse = try await provider.request(request, decoder: JSONDecoder())
+        let response: PostResponse = try await provider.request(request)
         #expect(response.json == Payload(message: "hello"))
     }
 
@@ -81,7 +81,7 @@ struct APIProviderIntegrationTests {
         let payload = RequestPayload().withUpload(.data(data))
         let request = SimpleRequest(path: "/post", method: .post, payload: payload)
 
-        let response: PostResponse = try await provider.request(request, decoder: JSONDecoder())
+        let response: PostResponse = try await provider.request(request)
         #expect(response.data == "raw-body")
     }
 }

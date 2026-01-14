@@ -104,7 +104,8 @@ public enum APIError: Error, Sendable {
 
 ```swift
 public protocol APIProviding: Sendable {
-    func request<T: Decodable>(_ target: any APIRequest, decoder: ResponseDecoder) async throws -> T
+    func request(_ target: any APIRequest) async throws
+    func request<T: Decodable>(_ target: any APIRequest) async throws -> T
     func requestTask(_ target: any APIRequest) async throws -> RequestTask
 }
 ```

@@ -30,10 +30,7 @@ let provider = APIProvider(
     builder: RequestBuilder(baseURL: baseURL)
 )
 
-let user: User = try await provider.request(
-    UserAPI.profile(id: "123"),
-    decoder: JSONDecoder()
-)
+let user: User = try await provider.request(UserAPI.profile(id: "123"))
 ```
 
 ## Docs

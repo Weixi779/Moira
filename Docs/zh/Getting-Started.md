@@ -56,10 +56,7 @@ let provider = APIProvider(client: AlamofireClient(), builder: builder)
 ## 解码响应
 
 ```swift
-let user: User = try await provider.request(
-    UserAPI.profile(id: "123"),
-    decoder: JSONDecoder()
-)
+let user: User = try await provider.request(UserAPI.profile(id: "123"))
 ```
 
 ## 获取原始响应

@@ -4,15 +4,18 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     private let client: APIClient
     private let builder: RequestBuilder
     private let runner: PluginRunner
+    private let decoder: ResponseDecoder
 
     public init(
         client: APIClient,
         builder: RequestBuilder,
+        decoder: ResponseDecoder = JSONDecoder(),
         plugins: [any RequestPlugin] = []
     ) {
         self.client = client
         self.builder = builder
         self.runner = PluginRunner(plugins: plugins)
+        self.decoder = decoder
     }
     
     @discardableResult
@@ -23,6 +26,10 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     
     public func request(_ target: any APIRequest) async throws {
         try await requestResponse(target)
+    }
+
+    public func request<T: Decodable>(_ target: any APIRequest) async throws -> T {
+        try await request(target, decoder: decoder)
     }
 
     public func request<T: Decodable>(

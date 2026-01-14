@@ -56,10 +56,7 @@ let provider = APIProvider(client: AlamofireClient(), builder: builder)
 ## Decode a response
 
 ```swift
-let user: User = try await provider.request(
-    UserAPI.profile(id: "123"),
-    decoder: JSONDecoder()
-)
+let user: User = try await provider.request(UserAPI.profile(id: "123"))
 ```
 
 ## Access raw responses
