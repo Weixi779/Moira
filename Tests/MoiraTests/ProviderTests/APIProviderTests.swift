@@ -143,7 +143,7 @@ struct APIProviderTests {
             ]
         )
 
-        let result = try await provider.request(SimpleRequest())
+        let result = try await provider.requestResponse(SimpleRequest())
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 0)
         #expect(await log.all() == ["willSend", "didReceive"])
@@ -166,7 +166,7 @@ struct APIProviderTests {
         )
 
         do {
-            _ = try await provider.request(SimpleRequest())
+            try await provider.request(SimpleRequest())
             #expect(Bool(false))
         } catch let error as APIError {
             if case .underlying = error {
@@ -204,7 +204,7 @@ struct APIProviderTests {
             ]
         )
 
-        let result = try await provider.request(SimpleRequest())
+        let result = try await provider.requestResponse(SimpleRequest())
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 2)
         #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "didReceive"])
@@ -224,7 +224,7 @@ struct APIProviderTests {
         )
 
         do {
-            _ = try await provider.request(SimpleRequest())
+            try await provider.request(SimpleRequest())
             #expect(Bool(false))
         } catch let error as APIError {
             if case .underlying = error {

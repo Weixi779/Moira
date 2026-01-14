@@ -65,7 +65,7 @@ let user: User = try await provider.request(
 ## 获取原始响应
 
 ```swift
-let response = try await provider.request(UserAPI.profile(id: "123"))
+let response = try await provider.requestResponse(UserAPI.profile(id: "123"))
 print(response.statusCode)
 print(response.data)
 ```

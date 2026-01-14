@@ -14,17 +14,22 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         self.builder = builder
         self.runner = PluginRunner(plugins: plugins)
     }
-
-    public func request(_ target: any APIRequest) async throws -> APIResponse {
+    
+    @discardableResult
+    public func requestResponse(_ target: any APIRequest) async throws -> APIResponse {
         let task = try await requestTask(target)
         return try await task.response()
+    }
+    
+    public func request(_ target: any APIRequest) async throws {
+        try await requestResponse(target)
     }
 
     public func request<T: Decodable>(
         _ target: any APIRequest,
         decoder: ResponseDecoder
     ) async throws -> T {
-        let response = try await request(target)
+        let response = try await requestResponse(target)
         do {
             return try decoder.decode(T.self, from: response.data)
         } catch {
