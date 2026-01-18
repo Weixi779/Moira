@@ -1,5 +1,7 @@
 # 请求构建
 
+Moira 提供了一套完整的 `URLRequest` 组装流程，目标是让构建过程更 API 化、更语义化，但不强制你依赖某种架构。它尽量贴近原生 `URLRequest` 的拼装方式，强调简单复用，并只抽象出最常见的 HTTP 概念，即使看起来组件数量不少。
+
 `RequestBuilder` 负责将 `APIRequest` 转为 `URLRequest`。
 
 ## URL 解析
@@ -19,7 +21,7 @@
 `RequestPayload.Body` 的编码策略：
 
 - `none`：不写入 body
-- `json`：使用 `JSONEncoder` 编码
+- `json`：通过 `JSONEncodable` 使用 `JSONEncoder` 编码
 - `urlEncodedForm`：`application/x-www-form-urlencoded; charset=utf-8`
 - `data`：`application/octet-stream`
 - `upload`：multipart 由 client 处理边界

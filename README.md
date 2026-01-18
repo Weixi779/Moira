@@ -2,6 +2,7 @@
 
 Moira is a lightweight networking layer built on Swift Concurrency.
 It provides clear request descriptions, a predictable lifecycle, and pluggable behavior.
+It focuses on making `URLRequest` assembly semantic and reusable without prescribing any architecture.
 
 ## Highlights
 

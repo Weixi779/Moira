@@ -59,6 +59,18 @@ public struct RequestPayload: Sendable {
 - `withData(_:)`
 - `withUpload(_:)`
 
+## JSONEncodable
+
+```swift
+public protocol JSONEncodable: Sendable {
+    func encode(using encoder: JSONEncoder) throws -> Data
+}
+
+public struct AnyJSONEncodable<T: Encodable & Sendable>: JSONEncodable {
+    public init(_ value: T)
+}
+```
+
 ## UploadSource
 
 ```swift
@@ -66,6 +78,17 @@ public enum UploadSource: Sendable {
     case data(Data)
     case file(URL)
     case multipart([MultipartFormPart])
+}
+```
+
+## MultipartFormPart
+
+```swift
+public struct MultipartFormPart: Sendable {
+    public let name: String
+    public let data: Data
+    public let fileName: String?
+    public let mimeType: String?
 }
 ```
 

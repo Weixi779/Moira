@@ -1,7 +1,10 @@
 import Foundation
 
+/// Represents a request that can yield progress and a response later.
 public final class RequestTask: Sendable {
+    /// Stream of upload/download progress updates.
     public let progress: AsyncStream<RequestProgress>?
+    /// Closure to fetch the response when awaited.
     public let response: @Sendable () async throws -> APIResponse
 
     public init(

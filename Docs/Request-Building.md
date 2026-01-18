@@ -1,5 +1,7 @@
 # Request Building
 
+Moira provides a complete flow for assembling `URLRequest`s. The goal is to make request building API-like and semantic without forcing a specific architecture. It stays close to native `URLRequest` composition, favors simple reuse, and models only the most common HTTP concepts even if there are multiple pieces.
+
 `RequestBuilder` converts `APIRequest` into `URLRequest`.
 
 ## URL resolution
@@ -19,7 +21,7 @@
 `RequestPayload.Body` is encoded as follows:
 
 - `none`: no body
-- `json`: encoded by `JSONEncoder`
+- `json`: encoded by `JSONEncodable` using `JSONEncoder`
 - `urlEncodedForm`: `application/x-www-form-urlencoded; charset=utf-8`
 - `data`: `application/octet-stream`
 - `upload`: multipart boundaries are set by the client
