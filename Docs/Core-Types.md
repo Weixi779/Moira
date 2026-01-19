@@ -94,6 +94,8 @@ public struct MultipartFormPart: Sendable {
 
 ## APIResponse
 
+Container for raw response data.
+
 ```swift
 public struct APIResponse: Sendable {
     public let statusCode: Int
@@ -105,6 +107,8 @@ public struct APIResponse: Sendable {
 
 ## ResponseDecoder
 
+Decoder interface used by `APIProvider`.
+
 ```swift
 public protocol ResponseDecoder: Sendable {
     func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T
@@ -114,6 +118,8 @@ extension JSONDecoder: ResponseDecoder {}
 ```
 
 ## APIError
+
+Errors surfaced by the request pipeline.
 
 ```swift
 public enum APIError: Error, Sendable {

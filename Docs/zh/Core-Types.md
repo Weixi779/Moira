@@ -94,6 +94,8 @@ public struct MultipartFormPart: Sendable {
 
 ## APIResponse
 
+原始响应数据的承载对象。
+
 ```swift
 public struct APIResponse: Sendable {
     public let statusCode: Int
@@ -105,6 +107,8 @@ public struct APIResponse: Sendable {
 
 ## ResponseDecoder
 
+`APIProvider` 使用的解码接口。
+
 ```swift
 public protocol ResponseDecoder: Sendable {
     func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T
@@ -114,6 +118,8 @@ extension JSONDecoder: ResponseDecoder {}
 ```
 
 ## APIError
+
+请求流程对外暴露的错误。
 
 ```swift
 public enum APIError: Error, Sendable {
