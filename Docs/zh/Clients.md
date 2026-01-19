@@ -1,6 +1,6 @@
 # Client 适配
 
-`APIClient` 是执行层，负责发起请求并返回 `APIResponse` 或 `RequestTask`。
+`APIClient` 是执行层，尽量贴近原生网络 API，负责发起请求并返回 `APIResponse` 或 `RequestTask`。
 
 ## APIClient
 
@@ -19,4 +19,4 @@ public protocol APIClient {
 行为说明：
 - response headers 会被归一化为 `[String: String]` 便于查看。
 - 上传/下载通过 `AsyncStream<RequestProgress>` 暴露进度。
-- 具体错误由 Provider 统一映射为 `APIError.underlying`。
+ - 具体错误会被包装为 `APIError.underlying`。

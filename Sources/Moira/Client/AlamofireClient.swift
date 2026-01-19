@@ -1,13 +1,16 @@
 import Alamofire
 import Foundation
 
+/// Alamofire-backed implementation of `APIClient`.
 public final class AlamofireClient: APIClient {
     private let session: Session
 
+    /// Creates a client using the provided Alamofire session.
     public init(session: Session = .default) {
         self.session = session
     }
 
+    /// Executes a data request and returns an `APIResponse`.
     public func request(_ request: URLRequest) async throws -> APIResponse {
         let dataResponse = await session.request(request).serializingData().response
 
