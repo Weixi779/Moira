@@ -1,9 +1,14 @@
 import Foundation
 
+/// Executes plugin chains for each plugin role.
 public struct PluginRunner: Sendable {
+    /// Transform plugins applied in order.
     public let transformPlugins: [TransformPlugin]
+    /// Observer plugins executed concurrently.
     public let observerPlugins: [ObserverPlugin]
+    /// Retry plugins evaluated in order.
     public let retryPlugins: [RetryPlugin]
+    /// Short-circuit plugins evaluated in order.
     public let shortCircuitPlugins: [ShortCircuitPlugin]
 
     public init(plugins: [any RequestPlugin]) {
@@ -13,10 +18,12 @@ public struct PluginRunner: Sendable {
         self.shortCircuitPlugins = plugins.compactMap { $0 as? ShortCircuitPlugin }
     }
 
+    /// Returns true when retry plugins are present.
     public var hasRetryPlugins: Bool { !retryPlugins.isEmpty }
 }
 
 extension PluginRunner: TransformPlugin {
+    /// Applies `prepareRequest` across all transform plugins in order.
     public func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
         var prepared = request
         for plugin in transformPlugins {
@@ -43,6 +50,7 @@ extension PluginRunner: TransformPlugin {
 }
 
 extension PluginRunner: ObserverPlugin {
+    /// Broadcasts `willSend` concurrently to observers.
     public func willSend(snapshot: RequestContext.Snapshot) async {
         await withTaskGroup(of: Void.self) { group in
             for plugin in observerPlugins {
@@ -75,6 +83,7 @@ extension PluginRunner: ObserverPlugin {
 }
 
 extension PluginRunner: RetryPlugin {
+    /// Returns the first retry decision that is not `.doNotRetry`.
     public func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
         for plugin in retryPlugins {
             let decision = await plugin.shouldRetry(snapshot: snapshot, error: error)
@@ -94,6 +103,7 @@ extension PluginRunner: RetryPlugin {
 }
 
 extension PluginRunner: ShortCircuitPlugin {
+    /// Returns the first short-circuit decision that is not `.miss`.
     public func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision {
         for plugin in shortCircuitPlugins {
             let decision = await plugin.evaluate(snapshot: snapshot)

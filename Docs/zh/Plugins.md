@@ -1,6 +1,6 @@
 # 插件体系
 
-Moira 将插件拆分为四类角色，每类职责清晰且可组合。
+Moira 将插件拆分为四类角色，每类职责清晰且可组合。`RequestPlugin` 是统一的标记协议，Provider 会收集并执行这些插件。
 
 ## TransformPlugin
 
@@ -73,7 +73,7 @@ public protocol ShortCircuitPlugin: RequestPlugin {
 
 ## RequestContext
 
-`RequestContext` 保存请求级状态，并提供只读快照供插件读取。
+`RequestContext` 保存请求级状态，并提供只读快照供插件读取。快照不可变，适合在并发的 Observer 中使用。
 
 ```swift
 public actor RequestContext {

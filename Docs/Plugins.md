@@ -1,6 +1,6 @@
 # Plugins
 
-Moira splits plugins into four roles so behavior stays composable.
+Moira splits plugins into four roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run plugins.
 
 ## TransformPlugin
 
@@ -73,7 +73,7 @@ public protocol ShortCircuitPlugin: RequestPlugin {
 
 ## RequestContext
 
-`RequestContext` carries request-scoped state and exposes a read-only snapshot.
+`RequestContext` carries request-scoped state and exposes a read-only snapshot for plugins. Snapshots are immutable and safe to use across concurrent observers.
 
 ```swift
 public actor RequestContext {
