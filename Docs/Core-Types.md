@@ -59,6 +59,10 @@ Convenience:
 - `withData(_:)`
 - `withUpload(_:)`
 
+Defaults:
+- `query = []`
+- `body = .none`
+
 ## JSONEncodable
 
 ```swift
@@ -140,6 +144,8 @@ public protocol APIProviding: Sendable {
 ```
 
 ## RequestTask
+
+`progress` is `nil` for non-upload/download requests.
 
 ```swift
 public final class RequestTask: Sendable {

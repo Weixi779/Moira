@@ -59,6 +59,10 @@ public struct RequestPayload: Sendable {
 - `withData(_:)`
 - `withUpload(_:)`
 
+默认值：
+- `query = []`
+- `body = .none`
+
 ## JSONEncodable
 
 ```swift
@@ -140,6 +144,8 @@ public protocol APIProviding: Sendable {
 ```
 
 ## RequestTask
+
+非上传/下载请求时，`progress` 为 `nil`。
 
 ```swift
 public final class RequestTask: Sendable {
