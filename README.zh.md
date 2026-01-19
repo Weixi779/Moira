@@ -1,14 +1,14 @@
 # Moira
 
-Moira 是一个基于 Swift Concurrency 的轻量网络层，提供清晰的请求描述、可预测的生命周期以及可插拔的插件体系。
-它把 `URLRequest` 的组装过程做成更语义化、更易复用的 API，但不强制你依赖某种架构。
+Moira 是一个基于 Swift Concurrency 的轻量网络层，
+把 `URLRequest` 的组装过程做成更语义化、更易复用的流程，但不强制你依赖某种架构。
 
 ## 主要能力
 
 - 请求描述：`APIRequest` + `RequestPayload`
-- 请求构建：`RequestBuilder`
+- 规则稳定的请求构建：`RequestBuilder`
 - 插件体系：Transform / Observer / Retry / ShortCircuit
-- 解码注入：`ResponseDecoder`
+- 默认解码：`ResponseDecoder`
 - 上传/下载进度：`RequestTask.progress`
 
 ## 快速示例
@@ -18,10 +18,43 @@ import Moira
 
 enum UserAPI: APIRequest {
     case profile(id: String)
+    case search(query: String)
+    case updateProfile(id: String, payload: UpdateProfile)
 
-    var path: String { "/users/\(id)" }
-    var method: RequestMethod { .get }
-    var payload: RequestPayload { RequestPayload() }
+    var path: String {
+        switch self {
+        case .profile(let id):
+            return "/users/\(id)"
+        case .search:
+            return "/users/search"
+        case .updateProfile(let id, _):
+            return "/users/\(id)"
+        }
+    }
+
+    var method: RequestMethod {
+        switch self {
+        case .profile, .search:
+            return .get
+        case .updateProfile:
+            return .patch
+        }
+    }
+
+    var payload: RequestPayload {
+        switch self {
+        case .profile:
+            return RequestPayload()
+        case .search(let query):
+            return RequestPayload().appendingQueryItem(URLQueryItem(name: "q", value: query))
+        case .updateProfile(_, let body):
+            return RequestPayload().withJSON(body)
+        }
+    }
+}
+
+struct UpdateProfile: Encodable, Sendable {
+    let name: String
 }
 
 let baseURL = URL(string: "https://api.example.com")!
@@ -31,6 +64,45 @@ let provider = APIProvider(
 )
 
 let user: User = try await provider.request(UserAPI.profile(id: "123"))
+```
+
+## Payload 示例
+
+```swift
+let queryPayload = RequestPayload()
+    .appendingQueryItems([URLQueryItem(name: "page", value: "1")])
+
+let formPayload = RequestPayload()
+    .withURLEncodedForm([URLQueryItem(name: "q", value: "swift")])
+
+let dataPayload = RequestPayload()
+    .withData(Data("raw".utf8))
+```
+
+## 获取原始响应
+
+```swift
+let response = try await provider.requestResponse(UserAPI.profile(id: "123"))
+print(response.statusCode)
+print(response.data)
+```
+
+## 上传/下载与进度
+
+```swift
+let request = UploadAPI.data(Data("payload".utf8))
+let task = try await provider.requestTask(request)
+
+if let progress = task.progress {
+    Task {
+        for await update in progress {
+            print(update.completedBytes)
+        }
+    }
+}
+
+let response = try await task.response()
+print(response.statusCode)
 ```
 
 ## 文档

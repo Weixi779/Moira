@@ -1,16 +1,15 @@
 # Moira
 
 Moira is a lightweight networking layer built on Swift Concurrency.
-It provides clear request descriptions, a predictable lifecycle, and pluggable behavior.
-It focuses on making `URLRequest` assembly semantic and reusable without prescribing any architecture.
+It turns `URLRequest` assembly into a semantic, reusable pipeline without prescribing any application architecture.
 
 ## Highlights
 
 - Request description: `APIRequest` + `RequestPayload`
-- Request building: `RequestBuilder`
-- Plugins: Transform / Observer / Retry / ShortCircuit
-- Decoder injection: `ResponseDecoder`
-- Upload/download progress: `RequestTask.progress`
+- Predictable build rules: `RequestBuilder`
+- Pluggable lifecycle: Transform / Observer / Retry / ShortCircuit
+- Default decoding via `ResponseDecoder`
+- Upload/download progress via `RequestTask.progress`
 
 ## Quick Example
 
@@ -19,10 +18,42 @@ import Moira
 
 enum UserAPI: APIRequest {
     case profile(id: String)
+    case search(query: String)
+    case updateProfile(id: String, payload: UpdateProfile)
 
-    var path: String { "/users/\(id)" }
-    var method: RequestMethod { .get }
-    var payload: RequestPayload { RequestPayload() }
+    var path: String {
+        switch self {
+        case .profile(let id):
+            return "/users/\(id)"
+        case .search:
+            return "/users/search"
+        case .updateProfile(let id, _):
+            return "/users/\(id)"
+        }
+    }
+
+    var method: RequestMethod {
+        switch self {
+        case .profile, .search:
+            return .get
+        case .updateProfile:
+            return .patch
+        }
+    }
+    var payload: RequestPayload {
+        switch self {
+        case .profile:
+            return RequestPayload()
+        case .search(let query):
+            return RequestPayload().appendingQueryItem(URLQueryItem(name: "q", value: query))
+        case .updateProfile(_, let body):
+            return RequestPayload().withJSON(body)
+        }
+    }
+}
+
+struct UpdateProfile: Encodable, Sendable {
+    let name: String
 }
 
 let baseURL = URL(string: "https://api.example.com")!
@@ -32,6 +63,45 @@ let provider = APIProvider(
 )
 
 let user: User = try await provider.request(UserAPI.profile(id: "123"))
+```
+
+## Payload Examples
+
+```swift
+let queryPayload = RequestPayload()
+    .appendingQueryItems([URLQueryItem(name: "page", value: "1")])
+
+let formPayload = RequestPayload()
+    .withURLEncodedForm([URLQueryItem(name: "q", value: "swift")])
+
+let dataPayload = RequestPayload()
+    .withData(Data("raw".utf8))
+```
+
+## Raw Response
+
+```swift
+let response = try await provider.requestResponse(UserAPI.profile(id: "123"))
+print(response.statusCode)
+print(response.data)
+```
+
+## Upload/Download with Progress
+
+```swift
+let request = UploadAPI.data(Data("payload".utf8))
+let task = try await provider.requestTask(request)
+
+if let progress = task.progress {
+    Task {
+        for await update in progress {
+            print(update.completedBytes)
+        }
+    }
+}
+
+let response = try await task.response()
+print(response.statusCode)
 ```
 
 ## Docs
