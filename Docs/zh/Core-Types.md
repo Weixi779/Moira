@@ -135,6 +135,8 @@ public enum APIError: Error, Sendable {
 
 ## APIProviding
 
+请求执行的上层接口。
+
 ```swift
 public protocol APIProviding: Sendable {
     func request(_ target: any APIRequest) async throws

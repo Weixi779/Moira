@@ -1,13 +1,16 @@
 import Foundation
 
+/// Builds `URLRequest` instances from `APIRequest` values.
 public struct RequestBuilder {
     public let baseURL: URL
     private let encoder = JSONEncoder()
 
+    /// Creates a builder with the base URL used for resolving paths.
     public init(baseURL: URL) {
         self.baseURL = baseURL
     }
 
+    /// Builds a `URLRequest` by resolving the URL, headers, and body.
     public func build(_ target: any APIRequest) throws -> URLRequest {
         let url = try buildURL(for: target)
         var request = URLRequest(url: url)
@@ -20,6 +23,7 @@ public struct RequestBuilder {
 }
 
 private extension RequestBuilder {
+    /// Resolves the final URL with base URL, path, and query items.
     func buildURL(for target: any APIRequest) throws -> URL {
         let resolvedBaseURL = target.baseURL ?? baseURL
         guard var url = URL(string: target.path, relativeTo: resolvedBaseURL) else {
@@ -32,6 +36,7 @@ private extension RequestBuilder {
         return url
     }
 
+    /// Encodes the request body and sets the `Content-Type` header if needed.
     func applyBody(_ body: RequestPayload.Body, to request: inout URLRequest) throws {
         switch body {
         case .none:
@@ -59,6 +64,7 @@ private extension RequestBuilder {
 }
 
 private extension URLRequest {
+    /// Applies additional headers onto a request.
     mutating func applyHeaders(_ headers: [String: String]?) {
         guard let headers else { return }
         for (key, value) in headers {
@@ -66,6 +72,7 @@ private extension URLRequest {
         }
     }
 
+    /// Sets the content type only when the header is missing.
     mutating func setContentTypeIfNeeded(_ contentType: String) {
         if value(forHTTPHeaderField: "Content-Type") == nil {
             setValue(contentType, forHTTPHeaderField: "Content-Type")
@@ -74,6 +81,7 @@ private extension URLRequest {
 }
 
 private extension Array where Element == URLQueryItem {
+    /// Encodes query items as `application/x-www-form-urlencoded`.
     var formEncodedString: String {
         var components = URLComponents()
         components.queryItems = self
