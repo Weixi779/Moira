@@ -24,3 +24,9 @@
 
 ## Docs Workflow
 - Keep docs in sync when changing public APIs.
+
+## Development Workflow
+- Align on the solution first before writing code.
+- During implementation, do not edit tests or docs.
+- After confirming the code is correct, update tests and docs.
+- Commit code changes separately from tests/docs changes.
