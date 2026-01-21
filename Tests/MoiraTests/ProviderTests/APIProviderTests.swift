@@ -268,6 +268,63 @@ struct APIProviderTests {
         #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
     }
 
+    @Test("retryAfterRetriesAndSucceeds")
+    func retryAfterRetriesAndSucceeds() async throws {
+        let log = EventLog()
+        let response = makeResponse()
+        let counter = AttemptCounter()
+        let client = MockClient { _ in
+            let attempt = await counter.next()
+            if attempt == 0 {
+                throw TestError.sample
+            }
+            return response
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        let provider = APIProvider(
+            client: client,
+            builder: builder,
+            plugins: [
+                ObserverProbe(log: log)
+            ],
+            retryPlugin: RetryProbe(log: log, decision: .retryAfter(0), policy: .reuseRequest)
+        )
+
+        let result = try await provider.requestResponse(SimpleRequest())
+        #expect(result.statusCode == response.statusCode)
+        #expect(client.requestCount == 2)
+        #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
+    }
+
+    @Test("providerDeallocationCancelsRequest")
+    func providerDeallocationCancelsRequest() async throws {
+        let log = EventLog()
+        let client = MockClient { _ in
+            makeResponse()
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        var provider: APIProvider? = APIProvider(
+            client: client,
+            builder: builder,
+            plugins: [ObserverProbe(log: log)]
+        )
+
+        let task = try await provider!.requestTask(SimpleRequest())
+        provider = nil
+
+        do {
+            _ = try await task.response()
+            #expect(Bool(false))
+        } catch is CancellationError {
+            #expect(Bool(true))
+        } catch {
+            #expect(Bool(false))
+        }
+
+        #expect(client.requestCount == 0)
+        #expect(await log.all() == ["willSend"])
+    }
+
     @Test("requestMapsUnderlyingErrors")
     func requestMapsUnderlyingErrors() async {
         let log = EventLog()
