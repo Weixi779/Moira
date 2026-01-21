@@ -1,6 +1,6 @@
 # Plugins
 
-Moira splits plugins into four roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run plugins.
+Moira splits plugins into four roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform, observer, and short-circuit plugins. Retry is configured separately.
 
 ## TransformPlugin
 
@@ -42,11 +42,19 @@ public enum RetryDecision: Sendable {
     case retryAfter(TimeInterval)
 }
 
-public protocol RetryPlugin: RequestPlugin {
+public enum RetryPolicy: Sendable {
+    case reuseRequest
+    case rebuildRequest
+}
+
+public protocol RetryPlugin: Sendable {
+    var policy: RetryPolicy { get }
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision
     func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async
 }
 ```
+
+Retry plugins are passed via `APIProvider(retryPlugin:)` and are optional.
 
 ## ShortCircuitPlugin
 
@@ -68,7 +76,7 @@ public protocol ShortCircuitPlugin: RequestPlugin {
 
 - Transform: runs in order, sequential.
 - Observer: runs concurrently.
-- Retry: first non-`doNotRetry` wins.
+- Retry: optional plugin decides when to retry and how to rebuild requests.
 - ShortCircuit: first hit wins.
 
 ## RequestContext
@@ -79,7 +87,7 @@ public protocol ShortCircuitPlugin: RequestPlugin {
 public actor RequestContext {
     public let id: UUID
     public let target: any APIRequest
-    public let startTime: Date
+    public private(set) var startTime: Date
 
     public private(set) var request: URLRequest?
     public private(set) var response: APIResponse?

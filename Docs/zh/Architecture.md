@@ -20,10 +20,12 @@ prepare -> build -> adapt -> willSend
 
 ## 重试
 
-- 失败后询问 RetryPlugin。
-- 每次重试都会重新走 client 执行路径。
+- 配置 RetryPlugin 时，失败后才会询问是否重试。
+- 每次重试会根据策略重建或复用请求，并重新走完整流程。
+- 每次重试都会触发 `willSend` 与 ShortCircuit 评估。
 - `willRetry` 在下一次尝试前触发。
 - 最终失败只触发一次 `didFail`。
+- 上传与下载默认不参与重试。
 
 ## 可观测性
 

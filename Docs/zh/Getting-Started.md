@@ -53,6 +53,26 @@ let builder = RequestBuilder(baseURL: baseURL)
 let provider = APIProvider(client: AlamofireClient(), builder: builder)
 ```
 
+## 配置重试
+
+```swift
+struct DefaultRetryPlugin: RetryPlugin {
+    let policy: RetryPolicy = .rebuildRequest
+
+    func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
+        snapshot.retryCount == 0 ? .retry : .doNotRetry
+    }
+
+    func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async {}
+}
+
+let provider = APIProvider(
+    client: AlamofireClient(),
+    builder: builder,
+    retryPlugin: DefaultRetryPlugin()
+)
+```
+
 ## 解码响应
 
 ```swift

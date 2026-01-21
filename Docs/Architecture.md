@@ -21,10 +21,12 @@ prepare -> build -> adapt -> willSend
 
 ## Retry
 
-- Retry decision is evaluated after a failure.
-- Each retry re-enters the client execution path.
+- Retry decision is evaluated after a failure when a retry plugin is configured.
+- Each retry rebuilds or reuses the request based on policy and re-enters the pipeline.
+- `willSend` and short-circuit plugins run for each retry attempt.
 - `willRetry` is fired before the next attempt.
 - Final failure triggers `didFail` once.
+- Uploads and downloads are not retried by default.
 
 ## Observability
 
