@@ -80,6 +80,7 @@ private struct ObserverProbe: ObserverPlugin {
 private struct RetryProbe: RetryPlugin {
     let log: EventLog
     let decision: RetryDecision
+    let policy: RetryPolicy
 
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
         await log.add("shouldRetry")
@@ -118,6 +119,29 @@ private enum TestError: Error {
     case sample
     case decodingFailed
     case unimplemented
+}
+
+private actor CountingTransformPlugin: TransformPlugin {
+    private var prepareCount = 0
+    private var adaptCount = 0
+
+    func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
+        prepareCount += 1
+        return request
+    }
+
+    func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
+        adaptCount += 1
+        return request
+    }
+
+    func processResponse(_ response: APIResponse) async throws -> APIResponse {
+        response
+    }
+
+    func counts() -> (prepare: Int, adapt: Int) {
+        (prepareCount, adaptCount)
+    }
 }
 
 private func makeResponse(statusCode: Int = 200, data: Data = Data()) -> APIResponse {
@@ -199,15 +223,49 @@ struct APIProviderTests {
             client: client,
             builder: builder,
             plugins: [
-                RetryProbe(log: log, decision: .retry),
                 ObserverProbe(log: log)
-            ]
+            ],
+            retryPlugin: RetryProbe(log: log, decision: .retry, policy: .reuseRequest)
         )
 
         let result = try await provider.requestResponse(SimpleRequest())
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 2)
-        #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "didReceive"])
+        #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
+    }
+
+    @Test("rebuildPolicyRebuildsRequestOnRetry")
+    func rebuildPolicyRebuildsRequestOnRetry() async throws {
+        let log = EventLog()
+        let response = makeResponse()
+        let counter = AttemptCounter()
+        let client = MockClient { _ in
+            let attempt = await counter.next()
+            if attempt == 0 {
+                throw TestError.sample
+            }
+            return response
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        let transform = CountingTransformPlugin()
+        let provider = APIProvider(
+            client: client,
+            builder: builder,
+            plugins: [
+                transform,
+                ObserverProbe(log: log)
+            ],
+            retryPlugin: RetryProbe(log: log, decision: .retry, policy: .rebuildRequest)
+        )
+
+        let result = try await provider.requestResponse(SimpleRequest())
+        let counts = await transform.counts()
+
+        #expect(result.statusCode == response.statusCode)
+        #expect(client.requestCount == 2)
+        #expect(counts.prepare == 2)
+        #expect(counts.adapt == 2)
+        #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
     }
 
     @Test("requestMapsUnderlyingErrors")

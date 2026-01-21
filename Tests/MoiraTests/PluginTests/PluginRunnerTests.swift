@@ -61,21 +61,6 @@ private struct ObserverProbe: ObserverPlugin {
     }
 }
 
-private struct RetryProbe: RetryPlugin {
-    let name: String
-    let log: EventLog
-    let decision: RetryDecision
-
-    func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
-        await log.add("shouldRetry:\(name)")
-        return decision
-    }
-
-    func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async {
-        await log.add("willRetry:\(name)")
-    }
-}
-
 private struct ShortCircuitProbe: ShortCircuitPlugin {
     let name: String
     let log: EventLog
@@ -145,59 +130,6 @@ struct PluginRunnerObserverTests {
         await log.clear()
         await runner.didFail(snapshot: snapshot)
         #expect(Set(await log.all()) == Set(["didFail:one", "didFail:two"]))
-    }
-
-}
-
-@Suite(.tags(.plugin, .retry))
-struct PluginRunnerRetryTests {
-    @Test("stopsAtFirstNonDefaultDecision")
-    func pluginRunnerRetryStopsAtFirstNonDefaultDecision() async {
-        let log = EventLog()
-        let runner = PluginRunner(plugins: [
-            RetryProbe(name: "one", log: log, decision: .doNotRetry),
-            RetryProbe(name: "two", log: log, decision: .retry)
-        ])
-
-        let snapshot = await makeSnapshot()
-        let decision = await runner.shouldRetry(snapshot: snapshot, error: TestError())
-        if case .retry = decision {
-            #expect(Bool(true))
-        } else {
-            #expect(Bool(false))
-        }
-        #expect(await log.all() == ["shouldRetry:one", "shouldRetry:two"])
-    }
-
-    @Test("skipsRemainingPluginsOnEarlyDecision")
-    func pluginRunnerRetrySkipsRemainingPluginsOnEarlyDecision() async {
-        let log = EventLog()
-        let runner = PluginRunner(plugins: [
-            RetryProbe(name: "one", log: log, decision: .retryAfter(1)),
-            RetryProbe(name: "two", log: log, decision: .retry)
-        ])
-
-        let snapshot = await makeSnapshot()
-        let decision = await runner.shouldRetry(snapshot: snapshot, error: TestError())
-        if case .retryAfter(let delay) = decision {
-            #expect(delay == 1)
-        } else {
-            #expect(Bool(false))
-        }
-        #expect(await log.all() == ["shouldRetry:one"])
-    }
-
-    @Test("willRetryNotifiesAllPluginsInOrder")
-    func pluginRunnerWillRetryNotifiesAllPluginsInOrder() async {
-        let log = EventLog()
-        let runner = PluginRunner(plugins: [
-            RetryProbe(name: "one", log: log, decision: .doNotRetry),
-            RetryProbe(name: "two", log: log, decision: .doNotRetry)
-        ])
-
-        let snapshot = await makeSnapshot()
-        await runner.willRetry(snapshot: snapshot, error: TestError(), decision: .retry)
-        #expect(await log.all() == ["willRetry:one", "willRetry:two"])
     }
 
 }
