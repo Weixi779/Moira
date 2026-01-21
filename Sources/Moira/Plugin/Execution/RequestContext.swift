@@ -7,7 +7,7 @@ public actor RequestContext {
     /// Original API request target.
     public let target: any APIRequest
     /// Timestamp when the request started.
-    public let startTime: Date
+    public private(set) var startTime: Date
 
     /// The built request, once available.
     public private(set) var request: URLRequest?
@@ -42,6 +42,14 @@ public actor RequestContext {
     /// Increments the retry attempt counter.
     public func incrementRetryCount() {
         retryCount += 1
+    }
+
+    /// Resets transient state for a retry attempt.
+    public func resetForRetry(request: URLRequest) {
+        startTime = Date()
+        self.request = request
+        response = nil
+        error = nil
     }
 
     /// Returns a read-only snapshot for plugins.

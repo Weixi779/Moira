@@ -6,18 +6,21 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     private let builder: RequestBuilder
     private let runner: PluginRunner
     private let decoder: ResponseDecoder
+    private let retryPlugin: RetryPlugin?
 
     /// Creates a provider with a client, builder, and optional plugins.
     public init(
         client: APIClient,
         builder: RequestBuilder,
         decoder: ResponseDecoder = JSONDecoder(),
-        plugins: [any RequestPlugin] = []
+        plugins: [any RequestPlugin] = [],
+        retryPlugin: RetryPlugin? = nil
     ) {
         self.client = client
         self.builder = builder
         self.runner = PluginRunner(plugins: plugins)
         self.decoder = decoder
+        self.retryPlugin = retryPlugin
     }
     
     /// Executes a request and returns the raw response.
@@ -69,6 +72,7 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
 
 private extension APIProvider {
     struct Pipeline {
+        let target: any APIRequest
         let prepared: any APIRequest
         let request: URLRequest
         let context: RequestContext
@@ -84,17 +88,16 @@ private extension APIProvider {
 
     /// Builds and adapts the request, then notifies observers.
     func preparePipeline(for target: any APIRequest) async throws -> Pipeline {
-        let prepared = try await runner.prepareRequest(target)
-        let built = try builder.build(prepared)
-        let adapted = try await runner.adaptRequest(built)
+        let (prepared, adapted) = try await buildRequest(for: target)
 
         let context = RequestContext(target: prepared)
         await context.updateRequest(adapted)
 
-        let snapshot = await context.snapshot()
-        await runner.willSend(snapshot: snapshot)
+        await notifyWillSend(context: context)
 
+        let snapshot = await context.snapshot()
         return Pipeline(
+            target: target,
             prepared: prepared,
             request: adapted,
             context: context,
@@ -131,7 +134,7 @@ private extension APIProvider {
         case .upload(let source, let request):
             return try await makeTask(kind: .upload(source: source, request: request), context: pipeline.context)
         case .request(let request):
-            return makeRetryableTask(kind: .request(request), context: pipeline.context)
+            return makeRetryableTask(target: pipeline.target, request: request, context: pipeline.context)
         case .download(let request):
             return try await makeTask(kind: .download(request: request), context: pipeline.context)
         }
@@ -150,6 +153,12 @@ private extension APIProvider {
         return processed
     }
 
+    /// Notifies observers before sending a request.
+    func notifyWillSend(context: RequestContext) async {
+        let snapshot = await context.snapshot()
+        await runner.willSend(snapshot: snapshot)
+    }
+
     /// Notifies observers about a successful response.
     func notifyDidReceive(context: RequestContext) async {
         let snapshot = await context.snapshot()
@@ -164,16 +173,20 @@ private extension APIProvider {
 
     /// Asks retry plugins for a decision.
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
-        await runner.shouldRetry(snapshot: snapshot, error: error)
+        guard let retryPlugin else {
+            return .doNotRetry
+        }
+        return await retryPlugin.shouldRetry(snapshot: snapshot, error: error)
     }
 
     /// Wraps execution with retry evaluation.
     func makeRetryableTask(
-        kind: ExecutionKind,
+        target: any APIRequest,
+        request: URLRequest,
         context: RequestContext
     ) -> RequestTask {
         let responseClosure = { @Sendable () async throws -> APIResponse in
-            try await self.performWithRetry(kind: kind, context: context)
+            try await self.performWithRetry(target: target, request: request, context: context)
         }
 
         return RequestTask(progress: nil, response: responseClosure)
@@ -181,14 +194,16 @@ private extension APIProvider {
 
     /// Executes and retries until a final decision is reached.
     func performWithRetry(
-        kind: ExecutionKind,
+        target: any APIRequest,
+        request: URLRequest,
         context: RequestContext
     ) async throws -> APIResponse {
         var attemptError: Error?
+        var currentRequest = request
 
         while true {
             do {
-                let task = try await self.makeClientTask(kind: kind)
+                let task = try await self.makeClientTask(kind: .request(currentRequest))
                 let response = try await task.response()
                 let processed = try await self.processResponse(response, context: context)
                 await self.notifyDidReceive(context: context)
@@ -201,19 +216,79 @@ private extension APIProvider {
                 let decision = await self.shouldRetry(snapshot: snapshot, error: error)
                 switch decision {
                 case .retry:
-                    await self.runner.willRetry(snapshot: snapshot, error: error, decision: decision)
+                    await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
                     await context.incrementRetryCount()
+                    currentRequest = try await prepareRetryRequest(
+                        target: target,
+                        current: currentRequest,
+                        context: context
+                    )
+                    if let shortCircuitResponse = try await tryShortCircuitRetry(context: context) {
+                        return shortCircuitResponse
+                    }
                     continue
                 case .retryAfter(let delay):
-                    await self.runner.willRetry(snapshot: snapshot, error: error, decision: decision)
+                    await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
                     await context.incrementRetryCount()
                     try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    currentRequest = try await prepareRetryRequest(
+                        target: target,
+                        current: currentRequest,
+                        context: context
+                    )
+                    if let shortCircuitResponse = try await tryShortCircuitRetry(context: context) {
+                        return shortCircuitResponse
+                    }
                     continue
                 case .doNotRetry:
                     await self.notifyDidFail(context: context)
                     throw attemptError ?? error
                 }
             }
+        }
+    }
+
+    func prepareRetryRequest(
+        target: any APIRequest,
+        current: URLRequest,
+        context: RequestContext
+    ) async throws -> URLRequest {
+        guard let retryPlugin else {
+            return current
+        }
+        let adapted: URLRequest
+        switch retryPlugin.policy {
+        case .reuseRequest:
+            adapted = current
+        case .rebuildRequest:
+            (_, adapted) = try await buildRequest(for: target)
+        }
+        await context.resetForRetry(request: adapted)
+        await notifyWillSend(context: context)
+        return adapted
+    }
+
+    func buildRequest(for target: any APIRequest) async throws -> (any APIRequest, URLRequest) {
+        let prepared = try await runner.prepareRequest(target)
+        let built = try builder.build(prepared)
+        let adapted = try await runner.adaptRequest(built)
+        return (prepared, adapted)
+    }
+
+    func tryShortCircuitRetry(context: RequestContext) async throws -> APIResponse? {
+        let snapshot = await context.snapshot()
+        let decision = await runner.evaluate(snapshot: snapshot)
+        switch decision {
+        case .hitResult(let response, _):
+            let processed = try await self.processResponse(response, context: context)
+            await self.notifyDidReceive(context: context)
+            return processed
+        case .hitError(let error, _):
+            await context.updateError(error)
+            await self.notifyDidFail(context: context)
+            throw error
+        case .miss:
+            return nil
         }
     }
 

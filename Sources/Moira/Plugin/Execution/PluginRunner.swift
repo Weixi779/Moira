@@ -6,20 +6,14 @@ public struct PluginRunner: Sendable {
     public let transformPlugins: [TransformPlugin]
     /// Observer plugins executed concurrently.
     public let observerPlugins: [ObserverPlugin]
-    /// Retry plugins evaluated in order.
-    public let retryPlugins: [RetryPlugin]
     /// Short-circuit plugins evaluated in order.
     public let shortCircuitPlugins: [ShortCircuitPlugin]
 
     public init(plugins: [any RequestPlugin]) {
         self.transformPlugins = plugins.compactMap { $0 as? TransformPlugin }
         self.observerPlugins = plugins.compactMap { $0 as? ObserverPlugin }
-        self.retryPlugins = plugins.compactMap { $0 as? RetryPlugin }
         self.shortCircuitPlugins = plugins.compactMap { $0 as? ShortCircuitPlugin }
     }
-
-    /// Returns true when retry plugins are present.
-    public var hasRetryPlugins: Bool { !retryPlugins.isEmpty }
 }
 
 extension PluginRunner: TransformPlugin {
@@ -78,26 +72,6 @@ extension PluginRunner: ObserverPlugin {
                     await plugin.didFail(snapshot: snapshot)
                 }
             }
-        }
-    }
-}
-
-extension PluginRunner: RetryPlugin {
-    /// Returns the first retry decision that is not `.doNotRetry`.
-    public func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
-        for plugin in retryPlugins {
-            let decision = await plugin.shouldRetry(snapshot: snapshot, error: error)
-            if case .doNotRetry = decision {
-                continue
-            }
-            return decision
-        }
-        return .doNotRetry
-    }
-
-    public func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async {
-        for plugin in retryPlugins {
-            await plugin.willRetry(snapshot: snapshot, error: error, decision: decision)
         }
     }
 }
