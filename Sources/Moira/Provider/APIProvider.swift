@@ -58,14 +58,18 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         do {
             let pipeline = try await preparePipeline(for: target)
 
-            if let task = await tryShortCircuit(pipeline) {
+            let decision = await runner.evaluate(snapshot: pipeline.snapshot)
+            if let task = makeShortCircuitTask(decision: decision, context: pipeline.context) {
                 return wrapTask(task)
             }
 
             let task = try await execute(pipeline)
             return wrapTask(task)
         } catch {
-            throw mapToAPIError(error)
+            if error is CancellationError {
+                throw error
+            }
+            throw Self.mapToAPIError(error)
         }
     }
 }
@@ -106,36 +110,35 @@ private extension APIProvider {
     }
 
     /// Returns a task if a short-circuit plugin provides a result.
-    func tryShortCircuit(_ pipeline: Pipeline) async -> RequestTask? {
-        let decision = await runner.evaluate(snapshot: pipeline.snapshot)
-        switch decision {
-        case .hitResult(let response, _):
-            let responseClosure = { @Sendable () async throws -> APIResponse in
-                let processed = try await self.processResponse(response, context: pipeline.context)
-                await self.notifyDidReceive(context: pipeline.context)
-                return processed
-            }
-            return RequestTask(progress: nil, response: responseClosure)
-        case .hitError(let error, _):
-            let responseClosure = { @Sendable () async throws -> APIResponse in
-                await pipeline.context.updateError(error)
-                await self.notifyDidFail(context: pipeline.context)
-                throw error
-            }
-            return RequestTask(progress: nil, response: responseClosure)
-        case .miss:
+    func makeShortCircuitTask(
+        decision: ShortCircuitDecision,
+        context: RequestContext
+    ) -> RequestTask? {
+        if case .miss = decision {
             return nil
         }
+        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+            guard let self else {
+                throw CancellationError()
+            }
+            guard let response = try await self.handleShortCircuitDecision(decision, context: context) else {
+                throw CancellationError()
+            }
+            return response
+        }
+        return RequestTask(progress: nil, response: responseClosure)
     }
 
     /// Creates a request task based on the execution kind.
     func execute(_ pipeline: Pipeline) async throws -> RequestTask {
         switch pipeline.executionKind {
         case .upload(let source, let request):
+            // Uploads are not retried because upload bodies are not always reusable.
             return try await makeTask(kind: .upload(source: source, request: request), context: pipeline.context)
         case .request(let request):
             return makeRetryableTask(target: pipeline.target, request: request, context: pipeline.context)
         case .download(let request):
+            // Downloads are not retried to avoid duplicate side effects or partial content conflicts.
             return try await makeTask(kind: .download(request: request), context: pipeline.context)
         }
     }
@@ -185,8 +188,11 @@ private extension APIProvider {
         request: URLRequest,
         context: RequestContext
     ) -> RequestTask {
-        let responseClosure = { @Sendable () async throws -> APIResponse in
-            try await self.performWithRetry(target: target, request: request, context: context)
+        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+            guard let self else {
+                throw CancellationError()
+            }
+            return try await self.performWithRetry(target: target, request: request, context: context)
         }
 
         return RequestTask(progress: nil, response: responseClosure)
@@ -201,7 +207,7 @@ private extension APIProvider {
         var attemptError: Error?
         var currentRequest = request
 
-        while true {
+        while !Task.isCancelled {
             do {
                 let task = try await self.makeClientTask(kind: .request(currentRequest))
                 let response = try await task.response()
@@ -209,6 +215,9 @@ private extension APIProvider {
                 await self.notifyDidReceive(context: context)
                 return processed
             } catch {
+                if error is CancellationError {
+                    throw error
+                }
                 attemptError = error
                 await context.updateError(error)
 
@@ -223,20 +232,28 @@ private extension APIProvider {
                         current: currentRequest,
                         context: context
                     )
-                    if let shortCircuitResponse = try await tryShortCircuitRetry(context: context) {
+                    let retryDecision = await runner.evaluate(snapshot: await context.snapshot())
+                    if let shortCircuitResponse = try await handleShortCircuitDecision(
+                        retryDecision,
+                        context: context
+                    ) {
                         return shortCircuitResponse
                     }
                     continue
                 case .retryAfter(let delay):
                     await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
                     await context.incrementRetryCount()
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Task.sleep(for: .seconds(delay))
                     currentRequest = try await prepareRetryRequest(
                         target: target,
                         current: currentRequest,
                         context: context
                     )
-                    if let shortCircuitResponse = try await tryShortCircuitRetry(context: context) {
+                    let retryDecision = await runner.evaluate(snapshot: await context.snapshot())
+                    if let shortCircuitResponse = try await handleShortCircuitDecision(
+                        retryDecision,
+                        context: context
+                    ) {
                         return shortCircuitResponse
                     }
                     continue
@@ -246,6 +263,7 @@ private extension APIProvider {
                 }
             }
         }
+        throw CancellationError()
     }
 
     func prepareRetryRequest(
@@ -275,9 +293,10 @@ private extension APIProvider {
         return (prepared, adapted)
     }
 
-    func tryShortCircuitRetry(context: RequestContext) async throws -> APIResponse? {
-        let snapshot = await context.snapshot()
-        let decision = await runner.evaluate(snapshot: snapshot)
+    func handleShortCircuitDecision(
+        _ decision: ShortCircuitDecision,
+        context: RequestContext
+    ) async throws -> APIResponse? {
         switch decision {
         case .hitResult(let response, _):
             let processed = try await self.processResponse(response, context: context)
@@ -298,7 +317,10 @@ private extension APIProvider {
         context: RequestContext
     ) async throws -> RequestTask {
         let task = try await makeClientTask(kind: kind)
-        let responseClosure = { @Sendable () async throws -> APIResponse in
+        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+            guard let self else {
+                throw CancellationError()
+            }
             do {
                 let response = try await task.response()
                 let processed = try await self.processResponse(response, context: context)
@@ -318,8 +340,11 @@ private extension APIProvider {
     func makeClientTask(kind: ExecutionKind) async throws -> RequestTask {
         switch kind {
         case .request(let request):
-            let responseClosure = { @Sendable () async throws -> APIResponse in
-                try await self.client.request(request)
+            let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+                guard let self else {
+                    throw CancellationError()
+                }
+                return try await self.client.request(request)
             }
             return RequestTask(progress: nil, response: responseClosure)
         case .upload(let source, let request):
@@ -331,11 +356,17 @@ private extension APIProvider {
 
     /// Maps client errors to `APIError` while preserving progress streams.
     func wrapTask(_ task: RequestTask) -> RequestTask {
-        let responseClosure = { @Sendable () async throws -> APIResponse in
+        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+            guard self != nil else {
+                throw CancellationError()
+            }
             do {
                 return try await task.response()
             } catch {
-                throw self.mapToAPIError(error)
+                if error is CancellationError {
+                    throw error
+                }
+                throw Self.mapToAPIError(error)
             }
         }
 
@@ -343,7 +374,7 @@ private extension APIProvider {
     }
 
     /// Ensures errors are surfaced as `APIError`.
-    func mapToAPIError(_ error: Error) -> APIError {
+    static func mapToAPIError(_ error: Error) -> APIError {
         if let apiError = error as? APIError {
             return apiError
         }
