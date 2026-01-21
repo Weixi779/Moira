@@ -3,6 +3,12 @@
 Moira 是一个基于 Swift Concurrency 的轻量网络层，
 把 `URLRequest` 的组装过程做成更语义化、更易复用的流程，但不强制你依赖某种架构。
 
+## 为什么是 Moira
+
+Moira 希望把网络层做得更薄，同时让请求的构建与流程可组合、可复用。
+这是对 `Moya` 之后网络层范式变化的一次回应。
+设计背景见：[文章](https://weixi779.github.io/2026/01/05/%E3%80%8CiOS%E3%80%8D%E7%BD%91%E7%BB%9C%E5%B1%82%E5%B7%A5%E7%A8%8B%E8%8C%83%E5%BC%8F%E8%BF%81%E7%A7%BB/)
+
 ## 主要能力
 
 - 请求描述：`APIRequest` + `RequestPayload`
