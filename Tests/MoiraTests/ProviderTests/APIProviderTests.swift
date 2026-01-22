@@ -40,11 +40,11 @@ private final class MockClient: APIClient {
         return try await handler(request)
     }
 
-    func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask {
+    func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask<APIResponse> {
         throw TestError.unimplemented
     }
 
-    func download(_ request: URLRequest) throws -> RequestTask {
+    func download(_ request: URLRequest) throws -> RequestTask<APIResponse> {
         throw TestError.unimplemented
     }
 }
@@ -294,6 +294,47 @@ struct APIProviderTests {
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 2)
         #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
+    }
+
+    @Test("requestTaskDecodedUsesProviderDecoder")
+    func requestTaskDecodedUsesProviderDecoder() async throws {
+        let client = MockClient { _ in
+            makeResponse(data: Data("{}".utf8))
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        let provider = APIProvider(client: client, builder: builder)
+
+        let task: RequestTask<EmptyResponse> = try await provider.requestTask(SimpleRequest())
+        _ = try await task.response()
+
+        #expect(client.requestCount == 1)
+    }
+
+    @Test("requestTaskDecodedMapsDecodingErrors")
+    func requestTaskDecodedMapsDecodingErrors() async {
+        let client = MockClient { _ in
+            makeResponse(data: Data("{}".utf8))
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        let provider = APIProvider(
+            client: client,
+            builder: builder,
+            decoder: ThrowingDecoder()
+        )
+
+        do {
+            let task: RequestTask<EmptyResponse> = try await provider.requestTask(SimpleRequest())
+            _ = try await task.response()
+            #expect(Bool(false))
+        } catch let error as APIError {
+            if case .responseDecodingFailed = error {
+                #expect(Bool(true))
+            } else {
+                #expect(Bool(false))
+            }
+        } catch {
+            #expect(Bool(false))
+        }
     }
 
     @Test("providerDeallocationCancelsRequest")
