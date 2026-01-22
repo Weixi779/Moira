@@ -128,6 +128,7 @@ private extension AlamofireClient {
             dataRequest = session.upload(url, with: request)
         case .multipart(let parts):
             var mutableRequest = request
+            // Allow Alamofire to set the multipart boundary.
             mutableRequest.setValue(nil, forHTTPHeaderField: "Content-Type")
             dataRequest = session.upload(multipartFormData: { form in
                 for part in parts {
