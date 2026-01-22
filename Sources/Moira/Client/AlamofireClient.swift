@@ -132,9 +132,14 @@ private extension AlamofireClient {
             mutableRequest.setValue(nil, forHTTPHeaderField: "Content-Type")
             dataRequest = session.upload(multipartFormData: { form in
                 for part in parts {
-                    if let fileName = part.fileName, let mimeType = part.mimeType {
+                    switch (part.fileName, part.mimeType) {
+                    case let (fileName?, mimeType?):
                         form.append(part.data, withName: part.name, fileName: fileName, mimeType: mimeType)
-                    } else {
+                    case let (fileName?, nil):
+                        form.append(part.data, withName: part.name, fileName: fileName, mimeType: "application/octet-stream")
+                    case let (nil, mimeType?):
+                        form.append(part.data, withName: part.name, mimeType: mimeType)
+                    case (nil, nil):
                         form.append(part.data, withName: part.name)
                     }
                 }
