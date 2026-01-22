@@ -54,7 +54,7 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     }
 
     /// Builds a pipeline, evaluates short-circuit plugins, and returns a task.
-    public func requestTask(_ target: any APIRequest) async throws -> RequestTask {
+    public func requestTask(_ target: any APIRequest) async throws -> RequestTask<APIResponse> {
         do {
             let pipeline = try await preparePipeline(for: target)
 
@@ -71,6 +71,23 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
             }
             throw Self.mapToAPIError(error)
         }
+    }
+
+    /// Builds a pipeline and returns a task that decodes the response body.
+    public func requestTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> RequestTask<T> {
+        let task: RequestTask<APIResponse> = try await requestTask(target)
+        let responseClosure = { @Sendable [weak self] () async throws -> T in
+            guard let self else {
+                throw CancellationError()
+            }
+            let response = try await task.response()
+            do {
+                return try self.decoder.decode(T.self, from: response.data)
+            } catch {
+                throw APIError.responseDecodingFailed(error)
+            }
+        }
+        return RequestTask<T>(progress: task.progress, response: responseClosure)
     }
 }
 
@@ -113,7 +130,7 @@ private extension APIProvider {
     func makeShortCircuitTask(
         decision: ShortCircuitDecision,
         context: RequestContext
-    ) -> RequestTask? {
+    ) -> RequestTask<APIResponse>? {
         if case .miss = decision {
             return nil
         }
@@ -130,7 +147,7 @@ private extension APIProvider {
     }
 
     /// Creates a request task based on the execution kind.
-    func execute(_ pipeline: Pipeline) async throws -> RequestTask {
+    func execute(_ pipeline: Pipeline) async throws -> RequestTask<APIResponse> {
         switch pipeline.executionKind {
         case .upload(let source, let request):
             // Uploads are not retried because upload bodies are not always reusable.
@@ -187,7 +204,7 @@ private extension APIProvider {
         target: any APIRequest,
         request: URLRequest,
         context: RequestContext
-    ) -> RequestTask {
+    ) -> RequestTask<APIResponse> {
         let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
             guard let self else {
                 throw CancellationError()
@@ -315,7 +332,7 @@ private extension APIProvider {
     func makeTask(
         kind: ExecutionKind,
         context: RequestContext
-    ) async throws -> RequestTask {
+    ) async throws -> RequestTask<APIResponse> {
         let task = try await makeClientTask(kind: kind)
         let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
             guard let self else {
@@ -337,7 +354,7 @@ private extension APIProvider {
     }
 
     /// Calls into the underlying client to create a task.
-    func makeClientTask(kind: ExecutionKind) async throws -> RequestTask {
+    func makeClientTask(kind: ExecutionKind) async throws -> RequestTask<APIResponse> {
         switch kind {
         case .request(let request):
             let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
@@ -355,7 +372,7 @@ private extension APIProvider {
     }
 
     /// Maps client errors to `APIError` while preserving progress streams.
-    func wrapTask(_ task: RequestTask) -> RequestTask {
+    func wrapTask(_ task: RequestTask<APIResponse>) -> RequestTask<APIResponse> {
         let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
             guard self != nil else {
                 throw CancellationError()

@@ -34,7 +34,7 @@ public final class AlamofireClient: APIClient {
     public func upload(
         _ request: URLRequest,
         source: UploadSource
-    ) throws -> RequestTask {
+    ) throws -> RequestTask<APIResponse> {
         let (request, progressStream, continuation) = try makeUploadRequest(request, source: source)
         let responseClosure = { @Sendable () async throws -> APIResponse in
             let dataResponse = await request.serializingData().response
@@ -61,7 +61,7 @@ public final class AlamofireClient: APIClient {
 
     public func download(
         _ request: URLRequest
-    ) throws -> RequestTask {
+    ) throws -> RequestTask<APIResponse> {
         let (stream, continuation) = AsyncStream<RequestProgress>.makeStream(
             bufferingPolicy: .bufferingNewest(1)
         )

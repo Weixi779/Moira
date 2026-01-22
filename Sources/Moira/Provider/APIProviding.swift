@@ -7,5 +7,7 @@ public protocol APIProviding: Sendable {
     /// Executes a request and decodes the response body.
     func request<T: Decodable>(_ target: any APIRequest) async throws -> T
     /// Returns a task for uploads/downloads with progress support.
-    func requestTask(_ target: any APIRequest) async throws -> RequestTask
+    func requestTask(_ target: any APIRequest) async throws -> RequestTask<APIResponse>
+    /// Returns a task that decodes the response body.
+    func requestTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> RequestTask<T>
 }
