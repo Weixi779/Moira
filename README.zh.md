@@ -15,7 +15,7 @@ Moira 希望把网络层做得更薄，同时让请求的构建与流程可组�
 - 规则稳定的请求构建：`RequestBuilder`
 - 插件体系：Transform / Observer / Retry / ShortCircuit
 - 默认解码：`ResponseDecoder`
-- 上传/下载进度：`RequestTask.progress`
+- 上传/下载进度：`RequestTask<APIResponse>.progress`
 
 ## 快速示例
 

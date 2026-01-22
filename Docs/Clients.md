@@ -1,15 +1,15 @@
 # Clients
 
 `APIClient` is the execution layer.
-It stays close to native networking APIs and returns `APIResponse` or `RequestTask` for uploads/downloads.
+It stays close to native networking APIs and returns `APIResponse` or `RequestTask<APIResponse>` for uploads/downloads.
 
 ## APIClient
 
 ```swift
 public protocol APIClient {
     func request(_ request: URLRequest) async throws -> APIResponse
-    func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask
-    func download(_ request: URLRequest) throws -> RequestTask
+    func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask<APIResponse>
+    func download(_ request: URLRequest) throws -> RequestTask<APIResponse>
 }
 ```
 

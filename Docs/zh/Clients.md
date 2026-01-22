@@ -1,14 +1,14 @@
 # Client 适配
 
-`APIClient` 是执行层，尽量贴近原生网络 API，负责发起请求并返回 `APIResponse` 或 `RequestTask`。
+`APIClient` 是执行层，尽量贴近原生网络 API，负责发起请求并返回 `APIResponse` 或 `RequestTask<APIResponse>`。
 
 ## APIClient
 
 ```swift
 public protocol APIClient {
     func request(_ request: URLRequest) async throws -> APIResponse
-    func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask
-    func download(_ request: URLRequest) throws -> RequestTask
+    func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask<APIResponse>
+    func download(_ request: URLRequest) throws -> RequestTask<APIResponse>
 }
 ```
 

@@ -15,7 +15,7 @@ Background: [essay](https://weixi779.github.io/2026/01/05/%E3%80%8CiOS%E3%80%8D%
 - Predictable build rules: `RequestBuilder`
 - Pluggable lifecycle: Transform / Observer / Retry / ShortCircuit
 - Default decoding via `ResponseDecoder`
-- Upload/download progress via `RequestTask.progress`
+- Upload/download progress via `RequestTask<APIResponse>.progress`
 
 ## Quick Example
 

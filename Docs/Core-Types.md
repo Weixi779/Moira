@@ -141,7 +141,8 @@ High-level interface for executing requests.
 public protocol APIProviding: Sendable {
     func request(_ target: any APIRequest) async throws
     func request<T: Decodable>(_ target: any APIRequest) async throws -> T
-    func requestTask(_ target: any APIRequest) async throws -> RequestTask
+    func requestTask(_ target: any APIRequest) async throws -> RequestTask<APIResponse>
+    func requestTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> RequestTask<T>
 }
 ```
 
@@ -150,9 +151,9 @@ public protocol APIProviding: Sendable {
 `progress` is `nil` for non-upload/download requests.
 
 ```swift
-public final class RequestTask: Sendable {
+public final class RequestTask<T: Sendable>: Sendable {
     public let progress: AsyncStream<RequestProgress>?
-    public let response: @Sendable () async throws -> APIResponse
+    public let response: @Sendable () async throws -> T
 }
 ```
 
