@@ -127,6 +127,8 @@ private extension AlamofireClient {
         case .file(let url):
             dataRequest = session.upload(url, with: request)
         case .multipart(let parts):
+            var mutableRequest = request
+            mutableRequest.setValue(nil, forHTTPHeaderField: "Content-Type")
             dataRequest = session.upload(multipartFormData: { form in
                 for part in parts {
                     if let fileName = part.fileName, let mimeType = part.mimeType {
@@ -135,7 +137,7 @@ private extension AlamofireClient {
                         form.append(part.data, withName: part.name)
                     }
                 }
-            }, with: request)
+            }, with: mutableRequest)
         }
 
         continuation.onTermination = { @Sendable _ in
