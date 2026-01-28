@@ -129,7 +129,7 @@ extension JSONDecoder: ResponseDecoder {}
 public enum APIError: Error, Sendable {
     case requestBuildingFailed(String)
     case responseDecodingFailed(Error)
-    case underlying(Error)
+    case underlying(Error, response: APIResponse?)
 }
 ```
 

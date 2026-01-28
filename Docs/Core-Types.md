@@ -129,7 +129,7 @@ Errors surfaced by the request pipeline.
 public enum APIError: Error, Sendable {
     case requestBuildingFailed(String)
     case responseDecodingFailed(Error)
-    case underlying(Error)
+    case underlying(Error, response: APIResponse?)
 }
 ```
 

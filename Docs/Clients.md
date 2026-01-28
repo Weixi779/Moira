@@ -20,4 +20,4 @@ public protocol APIClient {
 Behavior notes:
 - Headers are normalized into `[String: String]` for inspection.
 - Upload and download expose progress via `AsyncStream<RequestProgress>`.
-- Errors from Alamofire are wrapped as `APIError.underlying`.
+- Errors from Alamofire are wrapped as `APIError.underlying`, with the `APIResponse` attached when available.

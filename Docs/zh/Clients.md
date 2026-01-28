@@ -19,4 +19,4 @@ public protocol APIClient {
 行为说明：
 - response headers 会被归一化为 `[String: String]` 便于查看。
 - 上传/下载通过 `AsyncStream<RequestProgress>` 暴露进度。
- - 具体错误会被包装为 `APIError.underlying`。
+- 具体错误会被包装为 `APIError.underlying`，并在可用时附带 `APIResponse`。
