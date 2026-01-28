@@ -77,6 +77,30 @@ private struct ObserverProbe: ObserverPlugin {
     }
 }
 
+private actor ResponseCapture {
+    private var response: APIResponse?
+
+    func set(_ response: APIResponse?) {
+        self.response = response
+    }
+
+    func get() -> APIResponse? {
+        response
+    }
+}
+
+private struct ResponseCaptureProbe: ObserverPlugin {
+    let capture: ResponseCapture
+
+    func willSend(snapshot: RequestContext.Snapshot) async {}
+
+    func didReceive(snapshot: RequestContext.Snapshot) async {}
+
+    func didFail(snapshot: RequestContext.Snapshot) async {
+        await capture.set(snapshot.response)
+    }
+}
+
 private struct RetryProbe: RetryPlugin {
     let log: EventLog
     let decision: RetryDecision
@@ -193,7 +217,7 @@ struct APIProviderTests {
             try await provider.request(SimpleRequest())
             #expect(Bool(false))
         } catch let error as APIError {
-            if case .underlying = error {
+            if case .underlying(_, _) = error {
                 #expect(Bool(true))
             } else {
                 #expect(Bool(false))
@@ -383,7 +407,7 @@ struct APIProviderTests {
             try await provider.request(SimpleRequest())
             #expect(Bool(false))
         } catch let error as APIError {
-            if case .underlying = error {
+            if case .underlying(_, _) = error {
                 #expect(Bool(true))
             } else {
                 #expect(Bool(false))
@@ -394,6 +418,33 @@ struct APIProviderTests {
 
         #expect(client.requestCount == 1)
         #expect(await log.all() == ["willSend", "didFail"])
+    }
+
+    @Test("didFailSnapshotIncludesResponseFromUnderlyingError")
+    func didFailSnapshotIncludesResponseFromUnderlyingError() async {
+        let capture = ResponseCapture()
+        let body = Data("bad request".utf8)
+        let response = makeResponse(statusCode: 400, data: body)
+        let client = MockClient { _ in
+            throw APIError.underlying(TestError.sample, response: response)
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        let provider = APIProvider(
+            client: client,
+            builder: builder,
+            plugins: [ResponseCaptureProbe(capture: capture)]
+        )
+
+        do {
+            try await provider.request(SimpleRequest())
+            #expect(Bool(false))
+        } catch {
+            #expect(Bool(true))
+        }
+
+        let snapshotResponse = await capture.get()
+        #expect(snapshotResponse?.statusCode == 400)
+        #expect(snapshotResponse?.data == body)
     }
 
     @Test("decodeErrorsAreMappedToAPIError")
