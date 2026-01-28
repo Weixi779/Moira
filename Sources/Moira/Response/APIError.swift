@@ -7,7 +7,7 @@ public enum APIError: Error, Sendable {
     /// Response decoding failed with the provided decoder.
     case responseDecodingFailed(Error)
     /// Wraps errors thrown by clients or plugins.
-    case underlying(Error)
+    case underlying(Error, response: APIResponse?)
 }
 
 extension APIError: LocalizedError {
@@ -18,7 +18,7 @@ extension APIError: LocalizedError {
             return "Request building failed: \(reason)"
         case .responseDecodingFailed(let error):
             return "Response decoding failed: \(error.localizedDescription)"
-        case .underlying(let error):
+        case .underlying(let error, _):
             return "Request failed due to an underlying error: \(error.localizedDescription)"
         }
     }

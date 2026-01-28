@@ -237,6 +237,9 @@ private extension APIProvider {
                 }
                 attemptError = error
                 await context.updateError(error)
+                if let response = Self.response(from: error) {
+                    await context.updateResponse(response)
+                }
 
                 let snapshot = await context.snapshot()
                 let decision = await self.shouldRetry(snapshot: snapshot, error: error)
@@ -345,6 +348,9 @@ private extension APIProvider {
                 return processed
             } catch {
                 await context.updateError(error)
+                if let response = Self.response(from: error) {
+                    await context.updateResponse(response)
+                }
                 await self.notifyDidFail(context: context)
                 throw error
             }
@@ -395,6 +401,13 @@ private extension APIProvider {
         if let apiError = error as? APIError {
             return apiError
         }
-        return .underlying(error)
+        return .underlying(error, response: nil)
+    }
+
+    static func response(from error: Error) -> APIResponse? {
+        guard case let APIError.underlying(_, response) = error else {
+            return nil
+        }
+        return response
     }
 }
