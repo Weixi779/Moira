@@ -168,9 +168,14 @@ private extension APIProvider {
 
     /// Applies response transforms and stores the response in context.
     func processResponse(_ response: APIResponse, context: RequestContext) async throws -> APIResponse {
-        let processed = try await runner.processResponse(response)
-        await context.updateResponse(processed)
-        return processed
+        do {
+            let processed = try await runner.processResponse(response)
+            await context.updateResponse(processed)
+            return processed
+        } catch {
+            await context.updateResponse(response)
+            throw error
+        }
     }
 
     /// Notifies observers before sending a request.

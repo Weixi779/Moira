@@ -130,6 +130,20 @@ private struct ThrowingDecoder: ResponseDecoder, Sendable {
     }
 }
 
+private struct ThrowingTransformProbe: TransformPlugin {
+    func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
+        request
+    }
+
+    func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
+        request
+    }
+
+    func processResponse(_ response: APIResponse) async throws -> APIResponse {
+        throw TestError.sample
+    }
+}
+
 private actor AttemptCounter {
     private var value = 0
 
@@ -444,6 +458,36 @@ struct APIProviderTests {
 
         let snapshotResponse = await capture.get()
         #expect(snapshotResponse?.statusCode == 400)
+        #expect(snapshotResponse?.data == body)
+    }
+
+    @Test("didFailSnapshotIncludesResponseWhenTransformThrows")
+    func didFailSnapshotIncludesResponseWhenTransformThrows() async {
+        let capture = ResponseCapture()
+        let body = Data("boom".utf8)
+        let response = makeResponse(statusCode: 500, data: body)
+        let client = MockClient { _ in
+            response
+        }
+        let builder = RequestBuilder(baseURL: URL(string: "https://example.com")!)
+        let provider = APIProvider(
+            client: client,
+            builder: builder,
+            plugins: [
+                ThrowingTransformProbe(),
+                ResponseCaptureProbe(capture: capture)
+            ]
+        )
+
+        do {
+            try await provider.request(SimpleRequest())
+            #expect(Bool(false))
+        } catch {
+            #expect(Bool(true))
+        }
+
+        let snapshotResponse = await capture.get()
+        #expect(snapshotResponse?.statusCode == 500)
         #expect(snapshotResponse?.data == body)
     }
 
