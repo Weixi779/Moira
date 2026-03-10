@@ -1,13 +1,23 @@
 # Moira
 
-Moira 是一个基于 Swift Concurrency 的轻量网络层，
+![Platform](https://img.shields.io/badge/platform-iOS%2016.0%2B%20%7C%20macOS%2013.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/Moira)
+
+[English](README.md) | 简体中文
+
+Moira 是一个面向 Swift Concurrency 的轻量网络层，
 把 `URLRequest` 的组装过程做成更语义化、更易复用的流程，但不强制你依赖某种架构。
 
 ## 为什么是 Moira
 
-Moira 希望把网络层做得更薄，同时让请求的构建与流程可组合、可复用。
-这是对 `Moya` 之后网络层范式变化的一次回应。
-设计背景见：[文章](https://weixi779.github.io/2026/01/05/%E3%80%8CiOS%E3%80%8D%E7%BD%91%E7%BB%9C%E5%B1%82%E5%B7%A5%E7%A8%8B%E8%8C%83%E5%BC%8F%E8%BF%81%E7%A7%BB/)
+Moira 带着我对 `Moya` 的致敬。
+我曾经从 Moya 的接口建模思想里受益很多，但随着时间推移，维护状态、并发时代能力缺口和工程接入成本，让它越来越难适配现代项目。
+
+Moira 是这次迁移后的落地选择：
+- 网络层保持轻薄、可替换
+- 保留语义化的 API 描述与可组合能力
+- 全面拥抱 async/await 语境下的请求流程与生命周期扩展点
+
+设计背景见：[「iOS」网络层工程范式迁移](https://weixi779.github.io/2026/01/05/%E3%80%8CiOS%E3%80%8D%E7%BD%91%E7%BB%9C%E5%B1%82%E5%B7%A5%E7%A8%8B%E8%8C%83%E5%BC%8F%E8%BF%81%E7%A7%BB/)
 
 ## 主要能力
 
@@ -113,21 +123,19 @@ print(response.statusCode)
 
 ## 文档
 
-英文：
-- `Docs/Getting-Started.md`
-- `Docs/Core-Types.md`
-- `Docs/Plugins.md`
-- `Docs/Request-Building.md`
-- `Docs/Clients.md`
-- `Docs/Architecture.md`
+Moira 内置了完整的中英文文档，方便快速落地与深度扩展。
 
-中文：
-- `Docs/zh/Getting-Started.md`
-- `Docs/zh/Core-Types.md`
-- `Docs/zh/Plugins.md`
-- `Docs/zh/Request-Building.md`
-- `Docs/zh/Clients.md`
-- `Docs/zh/Architecture.md`
+导航入口：
+- 英文文档索引：`Docs/index.md`
+- 中文文档索引：`Docs/zh/index.md`
+
+核心文档：
+- 快速开始：`Docs/Getting-Started.md` / `Docs/zh/Getting-Started.md`
+- 核心类型：`Docs/Core-Types.md` / `Docs/zh/Core-Types.md`
+- 插件体系：`Docs/Plugins.md` / `Docs/zh/Plugins.md`
+- 请求构建：`Docs/Request-Building.md` / `Docs/zh/Request-Building.md`
+- Client 适配：`Docs/Clients.md` / `Docs/zh/Clients.md`
+- 架构设计：`Docs/Architecture.md` / `Docs/zh/Architecture.md`
 
 ## 构建与测试
 

@@ -1,13 +1,23 @@
 # Moira
 
-Moira is a lightweight networking layer built on Swift Concurrency.
-It turns `URLRequest` assembly into a semantic, reusable pipeline without prescribing any application architecture.
+![Platform](https://img.shields.io/badge/platform-iOS%2016.0%2B%20%7C%20macOS%2013.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/Moira)
+
+English | [简体中文](README.zh.md)
+
+Moira is a lightweight networking layer built for Swift Concurrency.
+It keeps request construction explicit and composable without forcing application architecture choices.
 
 ## Why Moira
 
-Moira keeps the networking layer thin while making request assembly explicit and composable.
-It is a response to the post-`Moya` shift toward a lighter, async/await-native pipeline.
-Background: [essay](https://weixi779.github.io/2026/01/05/%E3%80%8CiOS%E3%80%8D%E7%BD%91%E7%BB%9C%E5%B1%82%E5%B7%A5%E7%A8%8B%E8%8C%83%E5%BC%8F%E8%BF%81%E7%A7%BB/)
+Moira carries a personal tribute to `Moya`.
+I learned a lot from its API modeling ideas, but over time the maintenance burden, concurrency-era gaps, and growing integration friction made it hard to continue relying on it in modern projects.
+
+Moira is the practical answer to that transition:
+- Keep the networking layer thin and replaceable
+- Preserve semantic API description and composability
+- Embrace async/await-native request flow and clear lifecycle extension points
+
+Design background: [「iOS」网络层工程范式迁移](https://weixi779.github.io/2026/01/05/%E3%80%8CiOS%E3%80%8D%E7%BD%91%E7%BB%9C%E5%B1%82%E5%B7%A5%E7%A8%8B%E8%8C%83%E5%BC%8F%E8%BF%81%E7%A7%BB/)
 
 ## Highlights
 
@@ -112,21 +122,19 @@ print(response.statusCode)
 
 ## Docs
 
-English:
-- `Docs/Getting-Started.md`
-- `Docs/Core-Types.md`
-- `Docs/Plugins.md`
-- `Docs/Request-Building.md`
-- `Docs/Clients.md`
-- `Docs/Architecture.md`
+Moira ships with built-in documentation for both Chinese and English readers.
 
-Chinese:
-- `Docs/zh/Getting-Started.md`
-- `Docs/zh/Core-Types.md`
-- `Docs/zh/Plugins.md`
-- `Docs/zh/Request-Building.md`
-- `Docs/zh/Clients.md`
-- `Docs/zh/Architecture.md`
+Index:
+- English docs index: `Docs/index.md`
+- Chinese docs index: `Docs/zh/index.md`
+
+Core docs:
+- Getting Started: `Docs/Getting-Started.md` / `Docs/zh/Getting-Started.md`
+- Core Types: `Docs/Core-Types.md` / `Docs/zh/Core-Types.md`
+- Plugins: `Docs/Plugins.md` / `Docs/zh/Plugins.md`
+- Request Building: `Docs/Request-Building.md` / `Docs/zh/Request-Building.md`
+- Clients: `Docs/Clients.md` / `Docs/zh/Clients.md`
+- Architecture: `Docs/Architecture.md` / `Docs/zh/Architecture.md`
 
 ## Build & Test
 
