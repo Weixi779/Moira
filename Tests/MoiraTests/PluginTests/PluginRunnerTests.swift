@@ -92,7 +92,7 @@ struct PluginRunnerTransformTests {
         let log = EventLog()
         let runner = PluginRunner(plugins: [
             TransformProbe(name: "one", log: log),
-            TransformProbe(name: "two", log: log)
+            TransformProbe(name: "two", log: log),
         ])
 
         let request = TestRequest()
@@ -104,10 +104,9 @@ struct PluginRunnerTransformTests {
         #expect(events == [
             "prepare:one", "prepare:two",
             "adapt:one", "adapt:two",
-            "process:one", "process:two"
+            "process:one", "process:two",
         ])
     }
-
 }
 
 @Suite(.tags(.plugin, .runner))
@@ -117,23 +116,22 @@ struct PluginRunnerObserverTests {
         let log = EventLog()
         let runner = PluginRunner(plugins: [
             ObserverProbe(name: "one", log: log),
-            ObserverProbe(name: "two", log: log)
+            ObserverProbe(name: "two", log: log),
         ])
 
         let snapshot = await makeSnapshot()
 
         await runner.willSend(snapshot: snapshot)
-        #expect(Set(await log.all()) == Set(["willSend:one", "willSend:two"]))
+        #expect(await Set(log.all()) == Set(["willSend:one", "willSend:two"]))
 
         await log.clear()
         await runner.didReceive(snapshot: snapshot)
-        #expect(Set(await log.all()) == Set(["didReceive:one", "didReceive:two"]))
+        #expect(await Set(log.all()) == Set(["didReceive:one", "didReceive:two"]))
 
         await log.clear()
         await runner.didFail(snapshot: snapshot)
-        #expect(Set(await log.all()) == Set(["didFail:one", "didFail:two"]))
+        #expect(await Set(log.all()) == Set(["didFail:one", "didFail:two"]))
     }
-
 }
 
 @Suite(.tags(.plugin, .shortCircuit))
@@ -144,7 +142,7 @@ struct PluginRunnerShortCircuitTests {
         let runner = PluginRunner(plugins: [
             ShortCircuitProbe(name: "one", log: log, decision: .miss),
             ShortCircuitProbe(name: "two", log: log, decision: .hitResult(makeResponse())),
-            ShortCircuitProbe(name: "three", log: log, decision: .hitResult(makeResponse()))
+            ShortCircuitProbe(name: "three", log: log, decision: .hitResult(makeResponse())),
         ])
 
         let snapshot = await makeSnapshot()
@@ -163,7 +161,7 @@ struct PluginRunnerShortCircuitTests {
         let runner = PluginRunner(plugins: [
             ShortCircuitProbe(name: "one", log: log, decision: .miss),
             ShortCircuitProbe(name: "two", log: log, decision: .hitError(TestError())),
-            ShortCircuitProbe(name: "three", log: log, decision: .hitResult(makeResponse()))
+            ShortCircuitProbe(name: "three", log: log, decision: .hitResult(makeResponse())),
         ])
 
         let snapshot = await makeSnapshot()
@@ -181,7 +179,7 @@ struct PluginRunnerShortCircuitTests {
         let log = EventLog()
         let runner = PluginRunner(plugins: [
             ShortCircuitProbe(name: "one", log: log, decision: .miss),
-            ShortCircuitProbe(name: "two", log: log, decision: .miss)
+            ShortCircuitProbe(name: "two", log: log, decision: .miss),
         ])
 
         let snapshot = await makeSnapshot()

@@ -56,7 +56,7 @@ struct APIProviderRetryTests {
             builder: Support.makeBuilder(),
             plugins: [
                 transform,
-                Support.ObserverProbe(log: log)
+                Support.ObserverProbe(log: log),
             ],
             retryPlugin: Support.RetryProbe(log: log, decision: .retry, policy: .rebuildRequest)
         )
@@ -95,7 +95,7 @@ struct APIProviderRetryTests {
             builder: Support.makeBuilder(),
             plugins: [
                 Support.RetryAwareShortCircuitProbe(response: response),
-                Support.ObserverProbe(log: log)
+                Support.ObserverProbe(log: log),
             ],
             retryPlugin: Support.RetryProbe(log: log, decision: decision, policy: .reuseRequest)
         )

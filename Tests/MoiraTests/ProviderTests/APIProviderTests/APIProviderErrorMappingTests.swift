@@ -23,7 +23,7 @@ struct APIProviderErrorMappingTests {
         }
 
         guard let error else { return }
-        guard case .underlying(_, _) = error else {
+        guard case .underlying = error else {
             Issue.record("Expected APIError.underlying for client errors.")
             return
         }
@@ -68,7 +68,7 @@ struct APIProviderErrorMappingTests {
             builder: Support.makeBuilder(),
             plugins: [
                 Support.ThrowingTransformProbe(),
-                Support.ResponseCaptureProbe(capture: capture)
+                Support.ResponseCaptureProbe(capture: capture),
             ]
         )
 

@@ -54,7 +54,7 @@ struct APIProviderIntegrationTests {
         let builder = RequestBuilder(baseURL: IntegrationConfig.baseURL)
         let provider = APIProvider(client: AlamofireClient(), builder: builder)
         let payload = RequestPayload(query: [
-            URLQueryItem(name: "q", value: "moira")
+            URLQueryItem(name: "q", value: "moira"),
         ])
         let request = SimpleRequest(path: "/get", payload: payload)
 

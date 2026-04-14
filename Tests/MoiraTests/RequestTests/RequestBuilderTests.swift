@@ -59,7 +59,7 @@ struct RequestBuilderTests {
         let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
         let payload = RequestPayload(query: [
             URLQueryItem(name: "q", value: "moira"),
-            URLQueryItem(name: "page", value: "1")
+            URLQueryItem(name: "page", value: "1"),
         ])
         let request = SimpleRequest(path: "/search", payload: payload)
 
@@ -117,7 +117,7 @@ struct RequestBuilderTests {
     func buildEncodesURLEncodedForm() throws {
         let items = [
             URLQueryItem(name: "a", value: "1"),
-            URLQueryItem(name: "b", value: "2")
+            URLQueryItem(name: "b", value: "2"),
         ]
         let payload = RequestPayload().withURLEncodedForm(items)
         let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
@@ -152,7 +152,7 @@ struct RequestBuilderTests {
             ["data", "file"],
             [
                 UploadSource.data(Data([0x01])),
-                UploadSource.file(URL(fileURLWithPath: "/tmp/file.txt"))
+                UploadSource.file(URL(fileURLWithPath: "/tmp/file.txt")),
             ]
         )
     )

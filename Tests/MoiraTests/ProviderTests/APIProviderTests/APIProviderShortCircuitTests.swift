@@ -18,7 +18,7 @@ struct APIProviderShortCircuitTests {
             builder: Support.makeBuilder(),
             plugins: [
                 Support.ShortCircuitProbe(decision: .hitResult(response)),
-                Support.ObserverProbe(log: log)
+                Support.ObserverProbe(log: log),
             ]
         )
 
@@ -43,7 +43,7 @@ struct APIProviderShortCircuitTests {
             plugins: [
                 transform,
                 Support.ShortCircuitProbe(decision: .hitResult(response)),
-                Support.ObserverProbe(log: log)
+                Support.ObserverProbe(log: log),
             ]
         )
 
@@ -69,7 +69,7 @@ struct APIProviderShortCircuitTests {
             builder: Support.makeBuilder(),
             plugins: [
                 Support.ShortCircuitProbe(decision: .hitError(Support.TestError.sample)),
-                Support.ObserverProbe(log: log)
+                Support.ObserverProbe(log: log),
             ]
         )
 
@@ -78,7 +78,7 @@ struct APIProviderShortCircuitTests {
         }
 
         guard let error else { return }
-        guard case .underlying(_, _) = error else {
+        guard case .underlying = error else {
             Issue.record("Expected APIError.underlying when short-circuit returns an error.")
             return
         }

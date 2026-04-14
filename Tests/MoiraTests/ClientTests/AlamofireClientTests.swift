@@ -23,11 +23,12 @@ final class CaptureURLProtocol: URLProtocol {
 
         guard let url = request.url,
               let response = HTTPURLResponse(
-                url: url,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: nil
-              ) else {
+                  url: url,
+                  statusCode: 200,
+                  httpVersion: nil,
+                  headerFields: nil
+              )
+        else {
             client?.urlProtocolDidFinishLoading(self)
             return
         }
@@ -78,7 +79,7 @@ struct AlamofireClientTests {
         let parts = [
             MultipartFormPart(name: "metadata", data: Data("{\"a\":1}".utf8), fileName: nil, mimeType: "application/json"),
             MultipartFormPart(name: "blob", data: Data([0x01]), fileName: "blob.bin", mimeType: nil),
-            MultipartFormPart(name: "file", data: Data([0x02]), fileName: "photo.jpg", mimeType: "image/jpeg")
+            MultipartFormPart(name: "file", data: Data([0x02]), fileName: "photo.jpg", mimeType: "image/jpeg"),
         ]
 
         CaptureURLProtocol.lastRequest = nil

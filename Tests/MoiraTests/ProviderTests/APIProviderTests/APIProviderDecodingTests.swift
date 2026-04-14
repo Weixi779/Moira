@@ -36,7 +36,7 @@ struct APIProviderDecodingTests {
         }
 
         guard let error else { return }
-        guard case .responseDecodingFailed(_) = error else {
+        guard case .responseDecodingFailed = error else {
             Issue.record("Expected APIError.responseDecodingFailed from requestTask decoding.")
             return
         }
@@ -57,7 +57,7 @@ struct APIProviderDecodingTests {
         }
 
         guard let error else { return }
-        guard case .responseDecodingFailed(_) = error else {
+        guard case .responseDecodingFailed = error else {
             Issue.record("Expected APIError.responseDecodingFailed from request decoding.")
             return
         }

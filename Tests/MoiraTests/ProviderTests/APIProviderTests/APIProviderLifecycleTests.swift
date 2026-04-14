@@ -18,7 +18,7 @@ struct APIProviderLifecycleTests {
             plugins: [Support.ObserverProbe(log: log)]
         )
 
-        let task = try await provider!.requestTask(Support.SimpleRequest())
+        let task = try try await #require(provider?.requestTask(Support.SimpleRequest()))
         provider = nil
 
         await #expect(throws: CancellationError.self) {
