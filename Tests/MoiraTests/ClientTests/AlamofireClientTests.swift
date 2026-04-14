@@ -3,6 +3,8 @@ import Foundation
 import Testing
 @testable import Moira
 
+private let alamofireClientUploadURL = URL(string: "https://unit-test.invalid/upload")!
+
 final class CaptureURLProtocol: URLProtocol {
     static var lastRequest: URLRequest?
     static var lastBody: Data?
@@ -61,7 +63,7 @@ final class CaptureURLProtocol: URLProtocol {
     }
 }
 
-@Suite
+@Suite(.tags(.client))
 struct AlamofireClientTests {
     @Test("multipartUploadClearsContentType")
     func multipartUploadClearsContentType() async throws {
@@ -70,7 +72,7 @@ struct AlamofireClientTests {
         let session = Session(configuration: configuration)
         let client = AlamofireClient(session: session)
 
-        var request = URLRequest(url: URL(string: "https://example.com/upload")!)
+        var request = URLRequest(url: alamofireClientUploadURL)
         request.httpMethod = "POST"
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         let parts = [
@@ -80,22 +82,23 @@ struct AlamofireClientTests {
         ]
 
         CaptureURLProtocol.lastRequest = nil
+        CaptureURLProtocol.lastBody = nil
         let task = try client.upload(request, source: .multipart(parts))
         let response = try await task.response()
 
-        guard let capturedRequest = CaptureURLProtocol.lastRequest else {
-            #expect(Bool(false))
-            return
-        }
+        let capturedRequest = try #require(
+            CaptureURLProtocol.lastRequest,
+            "Expected the upload request to be captured by the custom URL protocol."
+        )
 
         let contentType = capturedRequest.value(forHTTPHeaderField: "Content-Type") ?? ""
         #expect(contentType.contains("multipart/form-data"))
         #expect(!contentType.contains("application/octet-stream"))
 
-        guard let body = CaptureURLProtocol.lastBody else {
-            #expect(Bool(false))
-            return
-        }
+        let body = try #require(
+            CaptureURLProtocol.lastBody,
+            "Expected the multipart upload body to be captured by the custom URL protocol."
+        )
 
         #expect(body.range(of: Data("Content-Type: application/json".utf8)) != nil)
         #expect(body.range(of: Data("Content-Type: application/octet-stream".utf8)) != nil)

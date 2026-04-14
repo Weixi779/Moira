@@ -13,10 +13,9 @@ struct RequestPayloadTests {
     func requestPayloadDefaults() {
         let payload = RequestPayload()
         #expect(payload.query.isEmpty)
-        if case .none = payload.body {
-            #expect(Bool(true))
-        } else {
-            #expect(Bool(false))
+        guard case .none = payload.body else {
+            Issue.record("Expected payload body to default to .none.")
+            return
         }
     }
 
@@ -72,28 +71,30 @@ struct RequestPayloadTests {
         let body = SampleBody(name: "moira", count: 2)
         let payload = RequestPayload().withJSON(body)
 
-        if case .json(let encodable) = payload.body {
-            let data = try encodable.encode(using: JSONEncoder())
-            let decoded = try JSONDecoder().decode(SampleBody.self, from: data)
-            #expect(decoded == body)
-        } else {
-            #expect(Bool(false))
+        guard case .json(let encodable) = payload.body else {
+            Issue.record("Expected payload body to store JSON data.")
+            return
         }
+
+        let data = try encodable.encode(using: JSONEncoder())
+        let decoded = try JSONDecoder().decode(SampleBody.self, from: data)
+        #expect(decoded == body)
     }
 
     @Test("withURLEncodedForm")
     func requestPayloadWithURLEncodedForm() {
         let items = [
-            URLQueryItem(name: "email", value: "a@example.com"),
+            URLQueryItem(name: "email", value: "a@unit-test.invalid"),
             URLQueryItem(name: "token", value: "123")
         ]
         let payload = RequestPayload().withURLEncodedForm(items)
 
-        if case .urlEncodedForm(let encoded) = payload.body {
-            #expect(encoded == items)
-        } else {
-            #expect(Bool(false))
+        guard case .urlEncodedForm(let encoded) = payload.body else {
+            Issue.record("Expected payload body to store URL-encoded form items.")
+            return
         }
+
+        #expect(encoded == items)
     }
 
     @Test("withDataBody")
@@ -101,26 +102,72 @@ struct RequestPayloadTests {
         let data = Data([0x01, 0x02, 0x03])
         let payload = RequestPayload().withData(data)
 
-        if case .data(let stored) = payload.body {
-            #expect(stored == data)
-        } else {
-            #expect(Bool(false))
+        guard case .data(let stored) = payload.body else {
+            Issue.record("Expected payload body to store raw data.")
+            return
         }
+
+        #expect(stored == data)
     }
 
-    @Test("withUploadBody")
-    func requestPayloadWithUploadBody() {
+    @Test("withUploadDataBody")
+    func requestPayloadWithUploadDataBody() {
         let data = Data([0x05, 0x06])
         let payload = RequestPayload().withUpload(.data(data))
 
-        if case .upload(let source) = payload.body {
-            if case .data(let stored) = source {
-                #expect(stored == data)
-            } else {
-                #expect(Bool(false))
-            }
-        } else {
-            #expect(Bool(false))
+        guard case .upload(let source) = payload.body else {
+            Issue.record("Expected payload body to store an upload source.")
+            return
         }
+        guard case .data(let stored) = source else {
+            Issue.record("Expected upload source to store raw upload data.")
+            return
+        }
+
+        #expect(stored == data)
+    }
+
+    @Test("withUploadFileBody")
+    func requestPayloadWithUploadFileBody() {
+        let fileURL = URL(fileURLWithPath: "/tmp/upload.bin")
+        let payload = RequestPayload().withUpload(.file(fileURL))
+
+        guard case .upload(let source) = payload.body else {
+            Issue.record("Expected payload body to store an upload source.")
+            return
+        }
+        guard case .file(let storedURL) = source else {
+            Issue.record("Expected upload source to store a file URL.")
+            return
+        }
+
+        #expect(storedURL == fileURL)
+    }
+
+    @Test("withUploadMultipartBody")
+    func requestPayloadWithUploadMultipartBody() throws {
+        let part = MultipartFormPart(
+            name: "file",
+            data: Data([0x07]),
+            fileName: "demo.bin",
+            mimeType: "application/octet-stream"
+        )
+        let payload = RequestPayload().withUpload(.multipart([part]))
+
+        guard case .upload(let source) = payload.body else {
+            Issue.record("Expected payload body to store an upload source.")
+            return
+        }
+        guard case .multipart(let parts) = source else {
+            Issue.record("Expected upload source to store multipart parts.")
+            return
+        }
+
+        #expect(parts.count == 1)
+        let storedPart = try #require(parts.first, "Expected the multipart payload to keep its single part.")
+        #expect(storedPart.name == part.name)
+        #expect(storedPart.data == part.data)
+        #expect(storedPart.fileName == part.fileName)
+        #expect(storedPart.mimeType == part.mimeType)
     }
 }

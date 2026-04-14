@@ -1,6 +1,7 @@
 import Testing
 
 extension Tag {
+    @Tag static var client: Self
     @Tag static var plugin: Self
     @Tag static var runner: Self
     @Tag static var retry: Self
