@@ -13,12 +13,12 @@ public enum APIError: Error, Sendable {
 extension APIError: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case .requestBuildingFailed(let reason):
+        case let .requestBuildingFailed(reason):
             if reason.isEmpty { return "Request building failed." }
             return "Request building failed: \(reason)"
-        case .responseDecodingFailed(let error):
+        case let .responseDecodingFailed(error):
             return "Response decoding failed: \(error.localizedDescription)"
-        case .underlying(let error, _):
+        case let .underlying(error, _):
             return "Request failed due to an underlying error: \(error.localizedDescription)"
         }
     }

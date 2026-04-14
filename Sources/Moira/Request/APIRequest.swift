@@ -19,11 +19,22 @@ public protocol APIRequest: Sendable {
 
 public extension APIRequest {
     /// Defaults to `nil`, so the provider base URL is used.
-    var baseURL: URL? { nil }
+    var baseURL: URL? {
+        nil
+    }
+
     /// Defaults to `nil`, so no extra headers are applied.
-    var headers: [String: String]? { nil }
+    var headers: [String: String]? {
+        nil
+    }
+
     /// Defaults to 60 seconds.
-    var timeout: TimeInterval { 60 }
+    var timeout: TimeInterval {
+        60
+    }
+
     /// Defaults to an empty payload.
-    var payload: RequestPayload { .init() }
+    var payload: RequestPayload {
+        .init()
+    }
 }

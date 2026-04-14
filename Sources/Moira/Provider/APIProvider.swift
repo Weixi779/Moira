@@ -22,14 +22,14 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         self.decoder = decoder
         self.retryPlugin = retryPlugin
     }
-    
+
     /// Executes a request and returns the raw response.
     @discardableResult
     public func requestResponse(_ target: any APIRequest) async throws -> APIResponse {
         let task = try await requestTask(target)
         return try await task.response()
     }
-    
+
     /// Executes a request while discarding the response body.
     public func request(_ target: any APIRequest) async throws {
         try await requestResponse(target)
@@ -100,7 +100,7 @@ private extension APIProvider {
         let snapshot: RequestContext.Snapshot
 
         var executionKind: ExecutionKind {
-            if case .upload(let source) = prepared.payload.body {
+            if case let .upload(source) = prepared.payload.body {
                 return .upload(source: source, request: request)
             }
             return .request(request)
@@ -149,14 +149,14 @@ private extension APIProvider {
     /// Creates a request task based on the execution kind.
     func execute(_ pipeline: Pipeline) async throws -> RequestTask<APIResponse> {
         switch pipeline.executionKind {
-        case .upload(let source, let request):
+        case let .upload(source, request):
             // Uploads are not retried because upload bodies are not always reusable.
-            return try await makeTask(kind: .upload(source: source, request: request), context: pipeline.context)
-        case .request(let request):
-            return makeRetryableTask(target: pipeline.target, request: request, context: pipeline.context)
-        case .download(let request):
+            try await makeTask(kind: .upload(source: source, request: request), context: pipeline.context)
+        case let .request(request):
+            makeRetryableTask(target: pipeline.target, request: request, context: pipeline.context)
+        case let .download(request):
             // Downloads are not retried to avoid duplicate side effects or partial content conflicts.
-            return try await makeTask(kind: .download(request: request), context: pipeline.context)
+            try await makeTask(kind: .download(request: request), context: pipeline.context)
         }
     }
 
@@ -257,7 +257,7 @@ private extension APIProvider {
                         current: currentRequest,
                         context: context
                     )
-                    let retryDecision = await runner.evaluate(snapshot: await context.snapshot())
+                    let retryDecision = await runner.evaluate(snapshot: context.snapshot())
                     if let shortCircuitResponse = try await handleShortCircuitDecision(
                         retryDecision,
                         context: context
@@ -265,7 +265,7 @@ private extension APIProvider {
                         return shortCircuitResponse
                     }
                     continue
-                case .retryAfter(let delay):
+                case let .retryAfter(delay):
                     await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
                     await context.incrementRetryCount()
                     try await Task.sleep(for: .seconds(delay))
@@ -274,7 +274,7 @@ private extension APIProvider {
                         current: currentRequest,
                         context: context
                     )
-                    let retryDecision = await runner.evaluate(snapshot: await context.snapshot())
+                    let retryDecision = await runner.evaluate(snapshot: context.snapshot())
                     if let shortCircuitResponse = try await handleShortCircuitDecision(
                         retryDecision,
                         context: context
@@ -323,11 +323,11 @@ private extension APIProvider {
         context: RequestContext
     ) async throws -> APIResponse? {
         switch decision {
-        case .hitResult(let response, _):
+        case let .hitResult(response, _):
             let processed = try await self.processResponse(response, context: context)
             await self.notifyDidReceive(context: context)
             return processed
-        case .hitError(let error, _):
+        case let .hitError(error, _):
             await context.updateError(error)
             await self.notifyDidFail(context: context)
             throw error
@@ -367,7 +367,7 @@ private extension APIProvider {
     /// Calls into the underlying client to create a task.
     func makeClientTask(kind: ExecutionKind) async throws -> RequestTask<APIResponse> {
         switch kind {
-        case .request(let request):
+        case let .request(request):
             let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
                 guard let self else {
                     throw CancellationError()
@@ -375,9 +375,9 @@ private extension APIProvider {
                 return try await self.client.request(request)
             }
             return RequestTask(progress: nil, response: responseClosure)
-        case .upload(let source, let request):
+        case let .upload(source, request):
             return try self.client.upload(request, source: source)
-        case .download(let request):
+        case let .download(request):
             return try self.client.download(request)
         }
     }

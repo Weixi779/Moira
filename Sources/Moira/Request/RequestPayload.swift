@@ -56,7 +56,7 @@ public struct RequestPayload: Sendable {
     }
 
     /// Returns a payload with a JSON body.
-    public func withJSON<T: Encodable & Sendable>(_ body: T) -> Self {
+    public func withJSON(_ body: some Encodable & Sendable) -> Self {
         var copy = self
         copy.body = .json(AnyJSONEncodable(body))
         return copy

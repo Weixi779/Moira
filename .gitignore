@@ -7,6 +7,7 @@ xcuserdata/
 
 ## Obj-C/Swift specific
 *.hmap
+*.swp
 .DS_Store
 
 ## App packaging

@@ -1,0 +1,14 @@
+--exclude .build
+--swiftversion 5.9
+--indent 4
+--indentcase false
+--linebreaks lf
+--maxwidth 140
+--allman false
+--header ignore
+--ifdef no-indent
+--wraparguments preserve
+--wrapparameters preserve
+--wrapcollections preserve
+--wrapconditions preserve
+--disable genericExtensions,hoistAwait,hoistPatternLet,opaqueGenericParameters,redundantReturn,redundantSelf,sortImports,trailingClosures,trailingCommas,unusedArguments,wrapPropertyBodies

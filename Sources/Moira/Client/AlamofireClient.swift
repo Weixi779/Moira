@@ -124,11 +124,11 @@ private extension AlamofireClient {
 
         let dataRequest: DataRequest
         switch source {
-        case .data(let data):
+        case let .data(data):
             dataRequest = session.upload(data, with: request)
-        case .file(let url):
+        case let .file(url):
             dataRequest = session.upload(url, with: request)
-        case .multipart(let parts):
+        case let .multipart(parts):
             var mutableRequest = request
             // Allow Alamofire to set the multipart boundary.
             mutableRequest.setValue(nil, forHTTPHeaderField: "Content-Type")

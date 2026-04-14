@@ -41,17 +41,17 @@ private extension RequestBuilder {
         switch body {
         case .none:
             break
-        case .json(let encodable):
+        case let .json(encodable):
             let data = try encodable.encode(using: encoder)
             request.httpBody = data
             request.setContentTypeIfNeeded("application/json")
-        case .urlEncodedForm(let items):
+        case let .urlEncodedForm(items):
             request.httpBody = items.formEncodedString.data(using: .utf8)
             request.setContentTypeIfNeeded("application/x-www-form-urlencoded; charset=utf-8")
-        case .data(let data):
+        case let .data(data):
             request.httpBody = data
             request.setContentTypeIfNeeded("application/octet-stream")
-        case .upload(let source):
+        case let .upload(source):
             // Uploads are handled by APIClient. Avoid setting multipart boundaries here.
             switch source {
             case .multipart:
@@ -80,7 +80,7 @@ private extension URLRequest {
     }
 }
 
-private extension Array where Element == URLQueryItem {
+private extension [URLQueryItem] {
     /// Encodes query items as `application/x-www-form-urlencoded`.
     var formEncodedString: String {
         var components = URLComponents()
