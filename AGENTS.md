@@ -22,6 +22,11 @@
 - 4-space indentation; prefer protocol-oriented design and async/await.
 - Keep APIs small and composable; avoid large enums that block plugin evolution.
 
+## Formatting
+- Swift formatting is defined by the repository-root `.swiftformat` file.
+- When changing Swift source, run `swiftformat . --config .swiftformat` before commit.
+- Keep manual edits aligned with the configured style; do not introduce one-off formatting conventions.
+
 ## Docs Workflow
 - Keep docs in sync when changing public APIs.
 
