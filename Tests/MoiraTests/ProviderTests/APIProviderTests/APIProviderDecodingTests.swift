@@ -6,21 +6,20 @@ private typealias Support = APIProviderTestSupport
 
 @Suite(.tags(.provider, .request))
 struct APIProviderDecodingTests {
-    @Test("requestTaskDecodedUsesProviderDecoder")
-    func requestTaskDecodedUsesProviderDecoder() async throws {
+    @Test("requestDecodedUsesProviderDecoder")
+    func requestDecodedUsesProviderDecoder() async throws {
         let client = Support.MockClient { _ in
             Support.makeResponse(data: Data("{}".utf8))
         }
         let provider = APIProvider(client: client, builder: Support.makeBuilder())
 
-        let task: RequestTask<Support.EmptyResponse> = try await provider.requestTask(Support.SimpleRequest())
-        _ = try await task.response()
+        let _: Support.EmptyResponse = try await provider.request(Support.SimpleRequest())
 
         #expect(client.requestCount == 1)
     }
 
-    @Test("requestTaskDecodedMapsDecodingErrors")
-    func requestTaskDecodedMapsDecodingErrors() async {
+    @Test("requestDecodedMapsDecodingErrors")
+    func requestDecodedMapsDecodingErrors() async {
         let client = Support.MockClient { _ in
             Support.makeResponse(data: Data("{}".utf8))
         }
@@ -31,13 +30,12 @@ struct APIProviderDecodingTests {
         )
 
         let error = await #expect(throws: APIError.self) {
-            let task: RequestTask<Support.EmptyResponse> = try await provider.requestTask(Support.SimpleRequest())
-            _ = try await task.response()
+            let _: Support.EmptyResponse = try await provider.request(Support.SimpleRequest())
         }
 
         guard let error else { return }
         guard case .responseDecodingFailed = error else {
-            Issue.record("Expected APIError.responseDecodingFailed from requestTask decoding.")
+            Issue.record("Expected APIError.responseDecodingFailed from request decoding.")
             return
         }
     }

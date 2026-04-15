@@ -31,7 +31,7 @@ struct APIProviderRetryTests {
             retryPlugin: Support.RetryProbe(log: log, decision: decision, policy: .reuseRequest)
         )
 
-        let result = try await provider.requestResponse(Support.SimpleRequest())
+        let result = try await provider.request(Support.SimpleRequest())
 
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 2)
@@ -61,7 +61,7 @@ struct APIProviderRetryTests {
             retryPlugin: Support.RetryProbe(log: log, decision: .retry, policy: .rebuildRequest)
         )
 
-        let result = try await provider.requestResponse(Support.SimpleRequest())
+        let result = try await provider.request(Support.SimpleRequest())
         let counts = await transform.counts()
 
         #expect(result.statusCode == response.statusCode)
@@ -100,7 +100,7 @@ struct APIProviderRetryTests {
             retryPlugin: Support.RetryProbe(log: log, decision: decision, policy: .reuseRequest)
         )
 
-        let result = try await provider.requestResponse(Support.SimpleRequest())
+        let result = try await provider.request(Support.SimpleRequest())
 
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 1)

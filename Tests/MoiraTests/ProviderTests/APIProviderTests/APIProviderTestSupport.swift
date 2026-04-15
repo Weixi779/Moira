@@ -49,14 +49,6 @@ enum APIProviderTestSupport {
             requestCount += 1
             return try await handler(request)
         }
-
-        func upload(_ request: URLRequest, source: UploadSource) throws -> RequestTask<APIResponse> {
-            throw APIProviderTestSupport.TestError.unimplemented
-        }
-
-        func download(_ request: URLRequest) throws -> RequestTask<APIResponse> {
-            throw APIProviderTestSupport.TestError.unimplemented
-        }
     }
 
     actor EventLog {

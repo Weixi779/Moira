@@ -22,7 +22,7 @@ struct APIProviderShortCircuitTests {
             ]
         )
 
-        let result = try await provider.requestResponse(Support.SimpleRequest())
+        let result = try await provider.request(Support.SimpleRequest())
 
         #expect(result.statusCode == response.statusCode)
         #expect(client.requestCount == 0)
@@ -47,7 +47,7 @@ struct APIProviderShortCircuitTests {
             ]
         )
 
-        let result = try await provider.requestResponse(Support.SimpleRequest())
+        let result = try await provider.request(Support.SimpleRequest())
         let counts = await transform.counts()
 
         #expect(result.statusCode == response.statusCode)

@@ -146,35 +146,6 @@ struct RequestBuilderTests {
         #expect(bodyData == data)
     }
 
-    @Test(
-        "buildSetsContentTypeForUploadDataOrFile",
-        arguments: zip(
-            ["data", "file"],
-            [
-                UploadSource.data(Data([0x01])),
-                UploadSource.file(URL(fileURLWithPath: "/tmp/file.txt")),
-            ]
-        )
-    )
-    func buildSetsContentTypeForUploadDataOrFile(_ label: String, _ source: UploadSource) throws {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
-        let request = SimpleRequest(method: .post, payload: RequestPayload().withUpload(source))
-
-        let built = try builder.build(request)
-        #expect(built.value(forHTTPHeaderField: "Content-Type") == "application/octet-stream")
-    }
-
-    @Test("buildSkipsContentTypeForMultipartUpload")
-    func buildSkipsContentTypeForMultipartUpload() throws {
-        let parts = [MultipartFormPart(name: "file", data: Data([0x01]))]
-        let payload = RequestPayload().withUpload(.multipart(parts))
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
-        let request = SimpleRequest(method: .post, payload: payload)
-
-        let built = try builder.build(request)
-        #expect(built.value(forHTTPHeaderField: "Content-Type") == nil)
-    }
-
     @Test("buildThrowsOnInvalidPath")
     func buildThrowsOnInvalidPath() {
         let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
