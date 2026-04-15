@@ -12,17 +12,41 @@ public struct RequestBuilder {
 
     /// Builds a `URLRequest` by resolving the URL, headers, and body.
     public func build(_ target: any APIRequest) throws -> URLRequest {
+        try validateExecution(target)
+
         let url = try buildURL(for: target)
         var request = URLRequest(url: url)
         request.httpMethod = target.method.rawValue
         request.timeoutInterval = target.timeout
         request.applyHeaders(target.headers)
         try applyBody(target.payload.body, to: &request)
+        applyUploadContentType(target.execution, to: &request)
         return request
     }
 }
 
 private extension RequestBuilder {
+    /// Validates that upload requests do not carry a payload body.
+    func validateExecution(_ target: any APIRequest) throws {
+        if case .upload = target.execution, case .none = target.payload.body {
+            return
+        }
+        if case .upload = target.execution {
+            throw APIError.invalidRequest("Upload requests must use payload.body == .none.")
+        }
+    }
+
+    /// Sets a default Content-Type for non-multipart upload sources.
+    func applyUploadContentType(_ execution: RequestExecution, to request: inout URLRequest) {
+        guard case let .upload(source) = execution else { return }
+        switch source {
+        case .data, .file:
+            request.setContentTypeIfNeeded("application/octet-stream")
+        case .multipart:
+            break
+        }
+    }
+
     /// Resolves the final URL with base URL, path, and query items.
     func buildURL(for target: any APIRequest) throws -> URL {
         let resolvedBaseURL = target.baseURL ?? baseURL

@@ -2,10 +2,18 @@ import Foundation
 
 /// Request-scoped state shared across the plugin pipeline.
 public actor RequestContext {
+    /// Whether the request is a regular request or an upload.
+    public enum ExecutionKind: Sendable {
+        case request
+        case upload
+    }
+
     /// Unique identifier for the request.
     public let id: UUID
     /// Original API request target.
     public let target: any APIRequest
+    /// Execution kind derived from the target.
+    public let executionKind: ExecutionKind
     /// Timestamp when the request started.
     public private(set) var startTime: Date
 
@@ -21,6 +29,11 @@ public actor RequestContext {
     public init(target: any APIRequest) {
         self.id = UUID()
         self.target = target
+        if case .upload = target.execution {
+            self.executionKind = .upload
+        } else {
+            self.executionKind = .request
+        }
         self.startTime = Date()
         self.retryCount = 0
     }
@@ -57,6 +70,7 @@ public actor RequestContext {
         Snapshot(
             id: id,
             target: target,
+            executionKind: executionKind,
             startTime: startTime,
             request: request,
             response: response,
@@ -71,6 +85,8 @@ public actor RequestContext {
         public let id: UUID
         /// Original API request target.
         public let target: any APIRequest
+        /// Execution kind derived from the target.
+        public let executionKind: ExecutionKind
         /// Timestamp when the request started.
         public let startTime: Date
         /// Built request if available.

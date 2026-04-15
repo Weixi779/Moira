@@ -8,6 +8,8 @@ public enum APIError: Error, Sendable {
     case responseDecodingFailed(Error)
     /// Wraps errors thrown by clients or plugins.
     case underlying(Error, response: APIResponse?)
+    /// Request violates a model constraint (e.g. upload with non-empty body).
+    case invalidRequest(String)
 }
 
 extension APIError: LocalizedError {
@@ -20,6 +22,9 @@ extension APIError: LocalizedError {
             return "Response decoding failed: \(error.localizedDescription)"
         case let .underlying(error, _):
             return "Request failed due to an underlying error: \(error.localizedDescription)"
+        case let .invalidRequest(reason):
+            if reason.isEmpty { return "Invalid request." }
+            return "Invalid request: \(reason)"
         }
     }
 }

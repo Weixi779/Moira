@@ -60,6 +60,48 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
             throw APIError.responseDecodingFailed(error)
         }
     }
+
+    /// Returns an upload task with progress for the raw response.
+    public func uploadTask(_ target: any APIRequest) async throws -> UploadTask<APIResponse> {
+        do {
+            let pipeline = try await preparePipeline(for: target)
+
+            guard case let .upload(source) = pipeline.prepared.execution else {
+                throw APIError.invalidRequest("uploadTask requires execution == .upload.")
+            }
+
+            let decision = await runner.evaluate(snapshot: pipeline.snapshot)
+            if let response = try await handleShortCircuitDecision(decision, context: pipeline.context) {
+                let (stream, continuation) = AsyncStream<UploadProgress>.makeStream()
+                continuation.finish()
+                return UploadTask(progress: stream) { response }
+            }
+
+            return try await executeUpload(source: source, request: pipeline.request, context: pipeline.context)
+        } catch {
+            if error is CancellationError {
+                throw error
+            }
+            throw Self.mapToAPIError(error)
+        }
+    }
+
+    /// Returns an upload task with progress that decodes the response body.
+    public func uploadTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> UploadTask<T> {
+        let task: UploadTask<APIResponse> = try await uploadTask(target)
+        let responseClosure = { @Sendable [weak self] () async throws -> T in
+            guard let self else {
+                throw CancellationError()
+            }
+            let response = try await task.response()
+            do {
+                return try self.decoder.decode(T.self, from: response.data)
+            } catch {
+                throw APIError.responseDecodingFailed(error)
+            }
+        }
+        return UploadTask<T>(progress: task.progress, response: responseClosure)
+    }
 }
 
 private extension APIProvider {
@@ -201,6 +243,34 @@ private extension APIProvider {
             }
         }
         throw CancellationError()
+    }
+
+    /// Executes an upload without retry, returning an UploadTask.
+    func executeUpload(
+        source: UploadSource,
+        request: URLRequest,
+        context: RequestContext
+    ) async throws -> UploadTask<APIResponse> {
+        let task = try client.upload(request, source: source)
+        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+            guard let self else {
+                throw CancellationError()
+            }
+            do {
+                let response = try await task.response()
+                let processed = try await self.processResponse(response, context: context)
+                await self.notifyDidReceive(context: context)
+                return processed
+            } catch {
+                await context.updateError(error)
+                if let response = Self.response(from: error) {
+                    await context.updateResponse(response)
+                }
+                await self.notifyDidFail(context: context)
+                throw error
+            }
+        }
+        return UploadTask(progress: task.progress, response: responseClosure)
     }
 
     func prepareRetryRequest(
