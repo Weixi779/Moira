@@ -6,6 +6,7 @@ private struct TestRequest: APIRequest {
     let path: String = "/test"
     let method: RequestMethod = .get
     let payload: RequestPayload = .init()
+    let execution: RequestExecution = .request
 }
 
 private actor EventLog {

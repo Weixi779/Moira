@@ -16,6 +16,7 @@ enum APIProviderTestSupport {
         let path: String
         let method: RequestMethod
         let payload: RequestPayload
+        let execution: RequestExecution
         let baseURL: URL?
         let headers: [String: String]?
         let timeout: TimeInterval
@@ -24,6 +25,7 @@ enum APIProviderTestSupport {
             path: String = "/test",
             method: RequestMethod = .get,
             payload: RequestPayload = .init(),
+            execution: RequestExecution = .request,
             baseURL: URL? = nil,
             headers: [String: String]? = nil,
             timeout: TimeInterval = 60
@@ -31,6 +33,7 @@ enum APIProviderTestSupport {
             self.path = path
             self.method = method
             self.payload = payload
+            self.execution = execution
             self.baseURL = baseURL
             self.headers = headers
             self.timeout = timeout
@@ -48,6 +51,10 @@ enum APIProviderTestSupport {
         func request(_ request: URLRequest) async throws -> APIResponse {
             requestCount += 1
             return try await handler(request)
+        }
+
+        func upload(_ request: URLRequest, source: UploadSource) throws -> UploadTask<APIResponse> {
+            throw APIProviderTestSupport.TestError.unimplemented
         }
     }
 

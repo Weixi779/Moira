@@ -13,6 +13,7 @@ private struct SimpleRequest: APIRequest {
     let path: String
     let method: RequestMethod
     let payload: RequestPayload
+    let execution: RequestExecution
     let baseURL: URL?
     let headers: [String: String]?
     let timeout: TimeInterval
@@ -21,6 +22,7 @@ private struct SimpleRequest: APIRequest {
         path: String,
         method: RequestMethod = .get,
         payload: RequestPayload = .init(),
+        execution: RequestExecution = .request,
         baseURL: URL? = nil,
         headers: [String: String]? = nil,
         timeout: TimeInterval = 30
@@ -28,6 +30,7 @@ private struct SimpleRequest: APIRequest {
         self.path = path
         self.method = method
         self.payload = payload
+        self.execution = execution
         self.baseURL = baseURL
         self.headers = headers
         self.timeout = timeout
