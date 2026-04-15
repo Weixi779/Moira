@@ -12,8 +12,6 @@ public struct RequestPayload: Sendable {
         case urlEncodedForm([URLQueryItem])
         /// Raw body data.
         case data(Data)
-        /// Upload payload handled by the client.
-        case upload(UploadSource)
     }
 
     /// Query items appended to the request URL.
@@ -73,13 +71,6 @@ public struct RequestPayload: Sendable {
     public func withData(_ data: Data) -> Self {
         var copy = self
         copy.body = .data(data)
-        return copy
-    }
-
-    /// Returns a payload with an upload source.
-    public func withUpload(_ source: UploadSource) -> Self {
-        var copy = self
-        copy.body = .upload(source)
         return copy
     }
 }

@@ -51,14 +51,6 @@ private extension RequestBuilder {
         case let .data(data):
             request.httpBody = data
             request.setContentTypeIfNeeded("application/octet-stream")
-        case let .upload(source):
-            // Uploads are handled by APIClient. Avoid setting multipart boundaries here.
-            switch source {
-            case .multipart:
-                break
-            case .data, .file:
-                request.setContentTypeIfNeeded("application/octet-stream")
-            }
         }
     }
 }

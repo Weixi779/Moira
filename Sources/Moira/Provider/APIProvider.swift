@@ -25,14 +25,22 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
 
     /// Executes a request and returns the raw response.
     @discardableResult
-    public func requestResponse(_ target: any APIRequest) async throws -> APIResponse {
-        let task = try await requestTask(target)
-        return try await task.response()
-    }
+    public func request(_ target: any APIRequest) async throws -> APIResponse {
+        do {
+            let pipeline = try await preparePipeline(for: target)
 
-    /// Executes a request while discarding the response body.
-    public func request(_ target: any APIRequest) async throws {
-        try await requestResponse(target)
+            let decision = await runner.evaluate(snapshot: pipeline.snapshot)
+            if let response = try await handleShortCircuitDecision(decision, context: pipeline.context) {
+                return response
+            }
+
+            return try await execute(pipeline)
+        } catch {
+            if error is CancellationError {
+                throw error
+            }
+            throw Self.mapToAPIError(error)
+        }
     }
 
     /// Executes a request and decodes the response using the default decoder.
@@ -45,49 +53,12 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         _ target: any APIRequest,
         decoder: ResponseDecoder
     ) async throws -> T {
-        let response = try await requestResponse(target)
+        let response = try await request(target)
         do {
             return try decoder.decode(T.self, from: response.data)
         } catch {
             throw APIError.responseDecodingFailed(error)
         }
-    }
-
-    /// Builds a pipeline, evaluates short-circuit plugins, and returns a task.
-    public func requestTask(_ target: any APIRequest) async throws -> RequestTask<APIResponse> {
-        do {
-            let pipeline = try await preparePipeline(for: target)
-
-            let decision = await runner.evaluate(snapshot: pipeline.snapshot)
-            if let task = makeShortCircuitTask(decision: decision, context: pipeline.context) {
-                return wrapTask(task)
-            }
-
-            let task = try await execute(pipeline)
-            return wrapTask(task)
-        } catch {
-            if error is CancellationError {
-                throw error
-            }
-            throw Self.mapToAPIError(error)
-        }
-    }
-
-    /// Builds a pipeline and returns a task that decodes the response body.
-    public func requestTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> RequestTask<T> {
-        let task: RequestTask<APIResponse> = try await requestTask(target)
-        let responseClosure = { @Sendable [weak self] () async throws -> T in
-            guard let self else {
-                throw CancellationError()
-            }
-            let response = try await task.response()
-            do {
-                return try self.decoder.decode(T.self, from: response.data)
-            } catch {
-                throw APIError.responseDecodingFailed(error)
-            }
-        }
-        return RequestTask<T>(progress: task.progress, response: responseClosure)
     }
 }
 
@@ -98,13 +69,6 @@ private extension APIProvider {
         let request: URLRequest
         let context: RequestContext
         let snapshot: RequestContext.Snapshot
-
-        var executionKind: ExecutionKind {
-            if case let .upload(source) = prepared.payload.body {
-                return .upload(source: source, request: request)
-            }
-            return .request(request)
-        }
     }
 
     /// Builds and adapts the request, then notifies observers.
@@ -126,44 +90,9 @@ private extension APIProvider {
         )
     }
 
-    /// Returns a task if a short-circuit plugin provides a result.
-    func makeShortCircuitTask(
-        decision: ShortCircuitDecision,
-        context: RequestContext
-    ) -> RequestTask<APIResponse>? {
-        if case .miss = decision {
-            return nil
-        }
-        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
-            guard let self else {
-                throw CancellationError()
-            }
-            guard let response = try await self.handleShortCircuitDecision(decision, context: context) else {
-                throw CancellationError()
-            }
-            return response
-        }
-        return RequestTask(progress: nil, response: responseClosure)
-    }
-
-    /// Creates a request task based on the execution kind.
-    func execute(_ pipeline: Pipeline) async throws -> RequestTask<APIResponse> {
-        switch pipeline.executionKind {
-        case let .upload(source, request):
-            // Uploads are not retried because upload bodies are not always reusable.
-            try await makeTask(kind: .upload(source: source, request: request), context: pipeline.context)
-        case let .request(request):
-            makeRetryableTask(target: pipeline.target, request: request, context: pipeline.context)
-        case let .download(request):
-            // Downloads are not retried to avoid duplicate side effects or partial content conflicts.
-            try await makeTask(kind: .download(request: request), context: pipeline.context)
-        }
-    }
-
-    enum ExecutionKind {
-        case request(URLRequest)
-        case upload(source: UploadSource, request: URLRequest)
-        case download(request: URLRequest)
+    /// Executes the request through the retry-capable path.
+    func execute(_ pipeline: Pipeline) async throws -> APIResponse {
+        try await performWithRetry(target: pipeline.target, request: pipeline.request, context: pipeline.context)
     }
 
     /// Applies response transforms and stores the response in context.
@@ -204,22 +133,6 @@ private extension APIProvider {
         return await retryPlugin.shouldRetry(snapshot: snapshot, error: error)
     }
 
-    /// Wraps execution with retry evaluation.
-    func makeRetryableTask(
-        target: any APIRequest,
-        request: URLRequest,
-        context: RequestContext
-    ) -> RequestTask<APIResponse> {
-        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
-            guard let self else {
-                throw CancellationError()
-            }
-            return try await self.performWithRetry(target: target, request: request, context: context)
-        }
-
-        return RequestTask(progress: nil, response: responseClosure)
-    }
-
     /// Executes and retries until a final decision is reached.
     func performWithRetry(
         target: any APIRequest,
@@ -231,8 +144,7 @@ private extension APIProvider {
 
         while !Task.isCancelled {
             do {
-                let task = try await self.makeClientTask(kind: .request(currentRequest))
-                let response = try await task.response()
+                let response = try await self.client.request(currentRequest)
                 let processed = try await self.processResponse(response, context: context)
                 await self.notifyDidReceive(context: context)
                 return processed
@@ -334,71 +246,6 @@ private extension APIProvider {
         case .miss:
             return nil
         }
-    }
-
-    /// Wraps the client task and records responses or failures.
-    func makeTask(
-        kind: ExecutionKind,
-        context: RequestContext
-    ) async throws -> RequestTask<APIResponse> {
-        let task = try await makeClientTask(kind: kind)
-        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
-            guard let self else {
-                throw CancellationError()
-            }
-            do {
-                let response = try await task.response()
-                let processed = try await self.processResponse(response, context: context)
-                await self.notifyDidReceive(context: context)
-                return processed
-            } catch {
-                await context.updateError(error)
-                if let response = Self.response(from: error) {
-                    await context.updateResponse(response)
-                }
-                await self.notifyDidFail(context: context)
-                throw error
-            }
-        }
-
-        return RequestTask(progress: task.progress, response: responseClosure)
-    }
-
-    /// Calls into the underlying client to create a task.
-    func makeClientTask(kind: ExecutionKind) async throws -> RequestTask<APIResponse> {
-        switch kind {
-        case let .request(request):
-            let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
-                guard let self else {
-                    throw CancellationError()
-                }
-                return try await self.client.request(request)
-            }
-            return RequestTask(progress: nil, response: responseClosure)
-        case let .upload(source, request):
-            return try self.client.upload(request, source: source)
-        case let .download(request):
-            return try self.client.download(request)
-        }
-    }
-
-    /// Maps client errors to `APIError` while preserving progress streams.
-    func wrapTask(_ task: RequestTask<APIResponse>) -> RequestTask<APIResponse> {
-        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
-            guard self != nil else {
-                throw CancellationError()
-            }
-            do {
-                return try await task.response()
-            } catch {
-                if error is CancellationError {
-                    throw error
-                }
-                throw Self.mapToAPIError(error)
-            }
-        }
-
-        return RequestTask(progress: task.progress, response: responseClosure)
     }
 
     /// Ensures errors are surfaced as `APIError`.
