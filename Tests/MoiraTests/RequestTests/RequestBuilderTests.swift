@@ -149,6 +149,54 @@ struct RequestBuilderTests {
         #expect(bodyData == data)
     }
 
+    @Test(
+        "buildSetsContentTypeForUploadDataOrFile",
+        arguments: zip(
+            ["data", "file"],
+            [
+                UploadSource.data(Data([0x01])),
+                UploadSource.file(URL(fileURLWithPath: "/tmp/file.txt")),
+            ]
+        )
+    )
+    func buildSetsContentTypeForUploadDataOrFile(_ label: String, _ source: UploadSource) throws {
+        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let request = SimpleRequest(method: .post, execution: .upload(source))
+
+        let built = try builder.build(request)
+        #expect(built.value(forHTTPHeaderField: "Content-Type") == "application/octet-stream")
+    }
+
+    @Test("buildSkipsContentTypeForMultipartUpload")
+    func buildSkipsContentTypeForMultipartUpload() throws {
+        let parts = [MultipartFormPart(name: "file", data: Data([0x01]))]
+        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let request = SimpleRequest(method: .post, execution: .upload(.multipart(parts)))
+
+        let built = try builder.build(request)
+        #expect(built.value(forHTTPHeaderField: "Content-Type") == nil)
+    }
+
+    @Test("buildThrowsInvalidRequestForUploadWithNonEmptyBody")
+    func buildThrowsInvalidRequestForUploadWithNonEmptyBody() {
+        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let request = SimpleRequest(
+            method: .post,
+            payload: RequestPayload().withData(Data([0x01])),
+            execution: .upload(.data(Data([0x02])))
+        )
+
+        let error = #expect(throws: APIError.self) {
+            try builder.build(request)
+        }
+
+        guard let error else { return }
+        guard case .invalidRequest = error else {
+            Issue.record("Expected APIError.invalidRequest for upload with non-empty body.")
+            return
+        }
+    }
+
     @Test("buildThrowsOnInvalidPath")
     func buildThrowsOnInvalidPath() {
         let builder = RequestBuilder(baseURL: requestBuilderBaseURL)

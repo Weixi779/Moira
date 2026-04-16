@@ -9,6 +9,7 @@ public protocol APIRequest: Sendable {
     var path: String { get }
     var method: RequestMethod { get }
     var payload: RequestPayload { get }
+    var execution: RequestExecution { get }
 
     var baseURL: URL? { get }
     var headers: [String: String]? { get }
@@ -21,6 +22,19 @@ Defaults:
 - `headers = nil`
 - `timeout = 60`
 - `payload = RequestPayload()`
+
+Note: `execution` has no default value. Every conformer must declare `.request` or `.upload(...)` explicitly.
+
+## RequestExecution
+
+```swift
+public enum RequestExecution: Sendable {
+    case request
+    case upload(UploadSource)
+}
+```
+
+Determines whether the request executes as a regular HTTP request or an upload. The provider dispatches based on this value.
 
 ## RequestMethod
 
@@ -45,7 +59,6 @@ public struct RequestPayload: Sendable {
         case json(any JSONEncodable)
         case urlEncodedForm([URLQueryItem])
         case data(Data)
-        case upload(UploadSource)
     }
 
     public var query: [URLQueryItem]
@@ -57,11 +70,12 @@ Convenience:
 - `withJSON(_:)`
 - `withURLEncodedForm(_:)`
 - `withData(_:)`
-- `withUpload(_:)`
 
 Defaults:
 - `query = []`
 - `body = .none`
+
+Upload payloads are not part of `RequestPayload.Body`. Use `execution: .upload(source)` instead.
 
 ## JSONEncodable
 
@@ -130,37 +144,46 @@ public enum APIError: Error, Sendable {
     case requestBuildingFailed(String)
     case responseDecodingFailed(Error)
     case underlying(Error, response: APIResponse?)
+    case invalidRequest(String)
 }
 ```
+
+`invalidRequest` is thrown when a request violates model constraints, such as an upload request with a non-empty `payload.body`.
 
 ## APIProviding
 
 High-level interface for executing requests.
 
 ```swift
-public protocol APIProviding: Sendable {
-    func request(_ target: any APIRequest) async throws
+public protocol APIRequesting: Sendable {
+    @discardableResult
+    func request(_ target: any APIRequest) async throws -> APIResponse
     func request<T: Decodable>(_ target: any APIRequest) async throws -> T
-    func requestTask(_ target: any APIRequest) async throws -> RequestTask<APIResponse>
-    func requestTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> RequestTask<T>
 }
+
+public protocol APIUploading: Sendable {
+    func uploadTask(_ target: any APIRequest) async throws -> UploadTask<APIResponse>
+    func uploadTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> UploadTask<T>
+}
+
+public protocol APIProviding: APIRequesting, APIUploading {}
 ```
 
-## RequestTask
+## UploadTask
 
-`progress` is `nil` for non-upload/download requests.
+Upload-specific task with non-optional progress.
 
 ```swift
-public final class RequestTask<T: Sendable>: Sendable {
-    public let progress: AsyncStream<RequestProgress>?
+public final class UploadTask<T: Sendable>: Sendable {
+    public let progress: AsyncStream<UploadProgress>
     public let response: @Sendable () async throws -> T
 }
 ```
 
-## RequestProgress
+## UploadProgress
 
 ```swift
-public struct RequestProgress: Sendable {
+public struct UploadProgress: Sendable {
     public let completedBytes: Int64
     public let totalBytes: Int64?
 }

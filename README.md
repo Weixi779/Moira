@@ -25,7 +25,7 @@ Design background: [「iOS」网络层工程范式迁移](https://weixi779.githu
 - Predictable build rules: `RequestBuilder`
 - Pluggable lifecycle: Transform / Observer / Retry / ShortCircuit
 - Default decoding via `ResponseDecoder`
-- Upload/download progress via `RequestTask<APIResponse>.progress`
+- Upload with progress via `UploadTask<APIResponse>`
 
 ## Quick Example
 
@@ -66,6 +66,8 @@ enum UserAPI: APIRequest {
             return RequestPayload().withJSON(body)
         }
     }
+
+    var execution: RequestExecution { .request }
 }
 
 struct UpdateProfile: Encodable, Sendable {
@@ -97,22 +99,31 @@ let dataPayload = RequestPayload()
 ## Raw Response
 
 ```swift
-let response = try await provider.requestResponse(UserAPI.profile(id: "123"))
+let response = try await provider.request(UserAPI.profile(id: "123"))
 print(response.statusCode)
 print(response.data)
 ```
 
-## Upload/Download with Progress
+## Upload with Progress
 
 ```swift
-let request = UploadAPI.data(Data("payload".utf8))
-let task = try await provider.requestTask(request)
+struct UploadAvatarRequest: APIRequest {
+    let path = "/avatar"
+    let method: RequestMethod = .post
+    let payload = RequestPayload()
+    let execution: RequestExecution
 
-if let progress = task.progress {
-    Task {
-        for await update in progress {
-            print(update.completedBytes)
-        }
+    init(source: UploadSource) {
+        self.execution = .upload(source)
+    }
+}
+
+let request = UploadAvatarRequest(source: .data(imageData))
+let task = try await provider.uploadTask(request)
+
+Task {
+    for await update in task.progress {
+        print(update.completedBytes)
     }
 }
 

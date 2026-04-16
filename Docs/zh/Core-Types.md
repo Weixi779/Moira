@@ -9,6 +9,7 @@ public protocol APIRequest: Sendable {
     var path: String { get }
     var method: RequestMethod { get }
     var payload: RequestPayload { get }
+    var execution: RequestExecution { get }
 
     var baseURL: URL? { get }
     var headers: [String: String]? { get }
@@ -21,6 +22,19 @@ public protocol APIRequest: Sendable {
 - `headers = nil`
 - `timeout = 60`
 - `payload = RequestPayload()`
+
+注意：`execution` 没有默认值，每个遵循者必须显式声明 `.request` 或 `.upload(...)`。
+
+## RequestExecution
+
+```swift
+public enum RequestExecution: Sendable {
+    case request
+    case upload(UploadSource)
+}
+```
+
+决定请求是普通 HTTP 请求还是上传请求。Provider 根据此值进行派发。
 
 ## RequestMethod
 
@@ -45,7 +59,6 @@ public struct RequestPayload: Sendable {
         case json(any JSONEncodable)
         case urlEncodedForm([URLQueryItem])
         case data(Data)
-        case upload(UploadSource)
     }
 
     public var query: [URLQueryItem]
@@ -57,11 +70,12 @@ public struct RequestPayload: Sendable {
 - `withJSON(_:)`
 - `withURLEncodedForm(_:)`
 - `withData(_:)`
-- `withUpload(_:)`
 
 默认值：
 - `query = []`
 - `body = .none`
+
+上传数据不属于 `RequestPayload.Body`，请使用 `execution: .upload(source)` 代替。
 
 ## JSONEncodable
 
@@ -130,37 +144,46 @@ public enum APIError: Error, Sendable {
     case requestBuildingFailed(String)
     case responseDecodingFailed(Error)
     case underlying(Error, response: APIResponse?)
+    case invalidRequest(String)
 }
 ```
+
+`invalidRequest` 在请求违反模型约束时抛出，例如上传请求同时携带非空 `payload.body`。
 
 ## APIProviding
 
 请求执行的上层接口。
 
 ```swift
-public protocol APIProviding: Sendable {
-    func request(_ target: any APIRequest) async throws
+public protocol APIRequesting: Sendable {
+    @discardableResult
+    func request(_ target: any APIRequest) async throws -> APIResponse
     func request<T: Decodable>(_ target: any APIRequest) async throws -> T
-    func requestTask(_ target: any APIRequest) async throws -> RequestTask<APIResponse>
-    func requestTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> RequestTask<T>
 }
+
+public protocol APIUploading: Sendable {
+    func uploadTask(_ target: any APIRequest) async throws -> UploadTask<APIResponse>
+    func uploadTask<T: Decodable & Sendable>(_ target: any APIRequest) async throws -> UploadTask<T>
+}
+
+public protocol APIProviding: APIRequesting, APIUploading {}
 ```
 
-## RequestTask
+## UploadTask
 
-非上传/下载请求时，`progress` 为 `nil`。
+上传专属任务类型，`progress` 非可空。
 
 ```swift
-public final class RequestTask<T: Sendable>: Sendable {
-    public let progress: AsyncStream<RequestProgress>?
+public final class UploadTask<T: Sendable>: Sendable {
+    public let progress: AsyncStream<UploadProgress>
     public let response: @Sendable () async throws -> T
 }
 ```
 
-## RequestProgress
+## UploadProgress
 
 ```swift
-public struct RequestProgress: Sendable {
+public struct UploadProgress: Sendable {
     public let completedBytes: Int64
     public let totalBytes: Int64?
 }

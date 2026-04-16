@@ -3,7 +3,7 @@ import Foundation
 /// Request-scoped state shared across the plugin pipeline.
 public actor RequestContext {
     /// Whether the request is a regular request or an upload.
-    public enum ExecutionKind: Sendable {
+    public enum ExecutionKind: Sendable, Equatable {
         case request
         case upload
     }

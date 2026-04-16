@@ -38,6 +38,8 @@ enum UserAPI: APIRequest {
             return RequestPayload().withJSON(body)
         }
     }
+
+    var execution: RequestExecution { .request }
 }
 
 struct UpdateProfile: Encodable, Sendable {
@@ -82,7 +84,7 @@ let user: User = try await provider.request(UserAPI.profile(id: "123"))
 ## 获取原始响应
 
 ```swift
-let response = try await provider.requestResponse(UserAPI.profile(id: "123"))
+let response = try await provider.request(UserAPI.profile(id: "123"))
 print(response.statusCode)
 print(response.data)
 ```
@@ -90,15 +92,24 @@ print(response.data)
 ## 上传与进度
 
 ```swift
-let data = Data("payload".utf8)
-let request = UploadAPI.data(data)
-let task = try await provider.requestTask(request)
+struct UploadRequest: APIRequest {
+    let path = "/upload"
+    let method: RequestMethod = .post
+    let payload = RequestPayload()
+    let execution: RequestExecution
 
-if let progress = task.progress {
-    Task {
-        for await update in progress {
-            print(update.completedBytes)
-        }
+    init(source: UploadSource) {
+        self.execution = .upload(source)
+    }
+}
+
+let data = Data("payload".utf8)
+let request = UploadRequest(source: .data(data))
+let task = try await provider.uploadTask(request)
+
+Task {
+    for await update in task.progress {
+        print(update.completedBytes)
     }
 }
 

@@ -75,4 +75,23 @@ struct APIProviderIntegrationTests {
         let response: PostResponse = try await provider.request(request)
         #expect(response.json == Payload(message: "hello"))
     }
+
+    @Test("uploadDataEchoesRawBody")
+    func uploadDataEchoesRawBody() async throws {
+        let builder = RequestBuilder(baseURL: IntegrationConfig.baseURL)
+        let provider = APIProvider(client: AlamofireClient(), builder: builder)
+        let data = Data("raw-body".utf8)
+        let request = SimpleRequest(
+            path: "/post",
+            method: .post,
+            execution: .upload(.data(data))
+        )
+
+        let task = try await provider.uploadTask(request)
+        let response: PostResponse = try await {
+            let raw = try await task.response()
+            return try JSONDecoder().decode(PostResponse.self, from: raw.data)
+        }()
+        #expect(response.data == "raw-body")
+    }
 }

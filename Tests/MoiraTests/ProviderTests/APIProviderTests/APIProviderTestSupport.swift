@@ -42,6 +42,7 @@ enum APIProviderTestSupport {
 
     final class MockClient: APIClient {
         private(set) var requestCount = 0
+        private(set) var uploadCount = 0
         private let handler: @Sendable (URLRequest) async throws -> APIResponse
 
         init(handler: @escaping @Sendable (URLRequest) async throws -> APIResponse) {
@@ -54,7 +55,13 @@ enum APIProviderTestSupport {
         }
 
         func upload(_ request: URLRequest, source: UploadSource) throws -> UploadTask<APIResponse> {
-            throw APIProviderTestSupport.TestError.unimplemented
+            uploadCount += 1
+            let handler = self.handler
+            let (stream, continuation) = AsyncStream<UploadProgress>.makeStream()
+            continuation.finish()
+            return UploadTask(progress: stream) {
+                try await handler(request)
+            }
         }
     }
 
@@ -202,6 +209,29 @@ enum APIProviderTestSupport {
         func counts() -> (prepare: Int, adapt: Int, process: Int) {
             (prepareCount, adaptCount, processCount)
         }
+    }
+
+    actor ExecutionKindCapture {
+        private var kind: RequestContext.ExecutionKind?
+
+        func set(_ kind: RequestContext.ExecutionKind) {
+            self.kind = kind
+        }
+
+        func get() -> RequestContext.ExecutionKind? {
+            kind
+        }
+    }
+
+    struct ExecutionKindProbe: ObserverPlugin {
+        let capture: ExecutionKindCapture
+
+        func willSend(snapshot: RequestContext.Snapshot) async {
+            await capture.set(snapshot.executionKind)
+        }
+
+        func didReceive(snapshot: RequestContext.Snapshot) async {}
+        func didFail(snapshot: RequestContext.Snapshot) async {}
     }
 
     struct EmptyResponse: Decodable {}
