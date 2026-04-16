@@ -1,9 +1,8 @@
 import Foundation
 
 /// Builds `URLRequest` instances from `APIRequest` values.
-public struct RequestBuilder {
+public struct URLRequestBuilder: Sendable {
     public let baseURL: URL
-    private let encoder = JSONEncoder()
 
     /// Creates a builder with the base URL used for resolving paths.
     public init(baseURL: URL) {
@@ -25,7 +24,7 @@ public struct RequestBuilder {
     }
 }
 
-private extension RequestBuilder {
+private extension URLRequestBuilder {
     /// Validates that upload requests do not carry a payload body.
     func validateExecution(_ target: any APIRequest) throws {
         if case .upload = target.execution, case .none = target.payload.body {
@@ -66,6 +65,7 @@ private extension RequestBuilder {
         case .none:
             break
         case let .json(encodable):
+            let encoder = JSONEncoder()
             let data = try encodable.encode(using: encoder)
             request.httpBody = data
             request.setContentTypeIfNeeded("application/json")

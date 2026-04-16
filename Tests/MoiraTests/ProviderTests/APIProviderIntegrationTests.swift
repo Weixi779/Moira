@@ -54,7 +54,7 @@ private struct Payload: Codable, Equatable {
 struct APIProviderIntegrationTests {
     @Test("getRequestReturnsArgs")
     func getRequestReturnsArgs() async throws {
-        let builder = RequestBuilder(baseURL: IntegrationConfig.baseURL)
+        let builder = URLRequestBuilder(baseURL: IntegrationConfig.baseURL)
         let provider = APIProvider(client: AlamofireClient(), builder: builder)
         let payload = RequestPayload(query: [
             URLQueryItem(name: "q", value: "moira"),
@@ -67,7 +67,7 @@ struct APIProviderIntegrationTests {
 
     @Test("postJSONBodyEchoesJSON")
     func postJSONBodyEchoesJSON() async throws {
-        let builder = RequestBuilder(baseURL: IntegrationConfig.baseURL)
+        let builder = URLRequestBuilder(baseURL: IntegrationConfig.baseURL)
         let provider = APIProvider(client: AlamofireClient(), builder: builder)
         let payload = RequestPayload().withJSON(Payload(message: "hello"))
         let request = SimpleRequest(path: "/post", method: .post, payload: payload)
@@ -78,7 +78,7 @@ struct APIProviderIntegrationTests {
 
     @Test("uploadDataEchoesRawBody")
     func uploadDataEchoesRawBody() async throws {
-        let builder = RequestBuilder(baseURL: IntegrationConfig.baseURL)
+        let builder = URLRequestBuilder(baseURL: IntegrationConfig.baseURL)
         let provider = APIProvider(client: AlamofireClient(), builder: builder)
         let data = Data("raw-body".utf8)
         let request = SimpleRequest(

@@ -4,8 +4,8 @@ import Foundation
 enum APIProviderTestSupport {
     static let baseURL = URL(string: "https://unit-test.invalid")!
 
-    static func makeBuilder() -> RequestBuilder {
-        RequestBuilder(baseURL: baseURL)
+    static func makeBuilder() -> URLRequestBuilder {
+        URLRequestBuilder(baseURL: baseURL)
     }
 
     static func makeResponse(statusCode: Int = 200, data: Data = Data()) -> APIResponse {

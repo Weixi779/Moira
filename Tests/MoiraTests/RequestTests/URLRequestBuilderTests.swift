@@ -34,10 +34,10 @@ private struct SimpleRequest: APIRequest {
 }
 
 @Suite(.tags(.request, .builder))
-struct RequestBuilderTests {
+struct URLRequestBuilderTests {
     @Test("buildUsesBaseURLAndMethod")
     func buildUsesBaseURLAndMethod() throws {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(path: "/v2/users", method: .post)
 
         let built = try builder.build(request)
@@ -47,7 +47,7 @@ struct RequestBuilderTests {
 
     @Test("buildUsesTargetBaseURLOverride")
     func buildUsesTargetBaseURLOverride() throws {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             path: "/v2/users",
             baseURL: requestBuilderOverrideBaseURL
@@ -59,7 +59,7 @@ struct RequestBuilderTests {
 
     @Test("buildAppliesQueryItems")
     func buildAppliesQueryItems() throws {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let payload = RequestPayload(query: [
             URLQueryItem(name: "q", value: "moira"),
             URLQueryItem(name: "page", value: "1"),
@@ -75,7 +75,7 @@ struct RequestBuilderTests {
 
     @Test("buildAppliesHeadersAndTimeout")
     func buildAppliesHeadersAndTimeout() throws {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             headers: ["X-Token": "abc"],
             timeout: 15
@@ -91,7 +91,7 @@ struct RequestBuilderTests {
         struct Body: Codable, Sendable, Equatable { let value: String }
         let body = Body(value: "ok")
         let payload = RequestPayload().withJSON(body)
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(method: .post, payload: payload)
 
         let built = try builder.build(request)
@@ -105,7 +105,7 @@ struct RequestBuilderTests {
     func buildKeepsExistingContentTypeHeader() throws {
         struct Body: Codable, Sendable { let value: String }
         let payload = RequestPayload().withJSON(Body(value: "ok"))
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             method: .post,
             payload: payload,
@@ -123,7 +123,7 @@ struct RequestBuilderTests {
             URLQueryItem(name: "b", value: "2"),
         ]
         let payload = RequestPayload().withURLEncodedForm(items)
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(method: .post, payload: payload)
 
         let built = try builder.build(request)
@@ -140,7 +140,7 @@ struct RequestBuilderTests {
     func buildEncodesDataBody() throws {
         let data = Data([0x01, 0x02])
         let payload = RequestPayload().withData(data)
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(method: .post, payload: payload)
 
         let built = try builder.build(request)
@@ -160,7 +160,7 @@ struct RequestBuilderTests {
         )
     )
     func buildSetsContentTypeForUploadDataOrFile(_ label: String, _ source: UploadSource) throws {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(method: .post, execution: .upload(source))
 
         let built = try builder.build(request)
@@ -170,7 +170,7 @@ struct RequestBuilderTests {
     @Test("buildSkipsContentTypeForMultipartUpload")
     func buildSkipsContentTypeForMultipartUpload() throws {
         let parts = [MultipartFormPart(name: "file", data: Data([0x01]))]
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(method: .post, execution: .upload(.multipart(parts)))
 
         let built = try builder.build(request)
@@ -179,7 +179,7 @@ struct RequestBuilderTests {
 
     @Test("buildThrowsInvalidRequestForUploadWithNonEmptyBody")
     func buildThrowsInvalidRequestForUploadWithNonEmptyBody() {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             method: .post,
             payload: RequestPayload().withData(Data([0x01])),
@@ -199,7 +199,7 @@ struct RequestBuilderTests {
 
     @Test("buildThrowsOnInvalidPath")
     func buildThrowsOnInvalidPath() {
-        let builder = RequestBuilder(baseURL: requestBuilderBaseURL)
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(path: "http://bad url")
 
         let error = #expect(throws: APIError.self) {

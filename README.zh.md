@@ -22,7 +22,7 @@ Moira 是这次迁移后的落地选择：
 ## 主要能力
 
 - 请求描述：`APIRequest` + `RequestPayload`
-- 规则稳定的请求构建：`RequestBuilder`
+- 规则稳定的请求构建：`URLRequestBuilder`
 - 插件体系：Transform / Observer / Retry / ShortCircuit
 - 默认解码：`ResponseDecoder`
 - 上传与进度：`UploadTask<APIResponse>`
@@ -78,7 +78,7 @@ struct UpdateProfile: Encodable, Sendable {
 let baseURL = URL(string: "https://api.example.com")!
 let provider = APIProvider(
     client: AlamofireClient(),
-    builder: RequestBuilder(baseURL: baseURL)
+    builder: URLRequestBuilder(baseURL: baseURL)
 )
 
 let user: User = try await provider.request(UserAPI.profile(id: "123"))

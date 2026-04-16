@@ -51,7 +51,7 @@ struct UpdateProfile: Encodable, Sendable {
 
 ```swift
 let baseURL = URL(string: "https://api.example.com")!
-let builder = RequestBuilder(baseURL: baseURL)
+let builder = URLRequestBuilder(baseURL: baseURL)
 let provider = APIProvider(client: AlamofireClient(), builder: builder)
 ```
 

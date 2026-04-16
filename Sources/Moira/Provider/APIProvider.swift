@@ -3,7 +3,7 @@ import Foundation
 /// Default provider implementation that runs the request pipeline.
 public final class APIProvider: APIProviding, @unchecked Sendable {
     private let client: APIClient
-    private let builder: RequestBuilder
+    private let builder: URLRequestBuilder
     private let runner: PluginRunner
     private let decoder: ResponseDecoder
     private let retryPlugin: RetryPlugin?
@@ -11,7 +11,7 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     /// Creates a provider with a client, builder, and optional plugins.
     public init(
         client: APIClient,
-        builder: RequestBuilder,
+        builder: URLRequestBuilder,
         decoder: ResponseDecoder = JSONDecoder(),
         plugins: [any RequestPlugin] = [],
         retryPlugin: RetryPlugin? = nil

@@ -22,7 +22,7 @@ Design background: [「iOS」网络层工程范式迁移](https://weixi779.githu
 ## Highlights
 
 - Request description: `APIRequest` + `RequestPayload`
-- Predictable build rules: `RequestBuilder`
+- Predictable build rules: `URLRequestBuilder`
 - Pluggable lifecycle: Transform / Observer / Retry / ShortCircuit
 - Default decoding via `ResponseDecoder`
 - Upload with progress via `UploadTask<APIResponse>`
@@ -77,7 +77,7 @@ struct UpdateProfile: Encodable, Sendable {
 let baseURL = URL(string: "https://api.example.com")!
 let provider = APIProvider(
     client: AlamofireClient(),
-    builder: RequestBuilder(baseURL: baseURL)
+    builder: URLRequestBuilder(baseURL: baseURL)
 )
 
 let user: User = try await provider.request(UserAPI.profile(id: "123"))
