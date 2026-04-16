@@ -23,6 +23,8 @@ public protocol APIRequest: Sendable {
 - `timeout = 60`
 - `payload = RequestPayload()`
 
+`path` 会被当作 endpoint path 追加到最终 baseURL 的 path 后面；前导 `/` 不会让它回退到 host 根路径。
+
 注意：`execution` 没有默认值，每个遵循者必须显式声明 `.request` 或 `.upload(...)`。
 
 ## RequestExecution

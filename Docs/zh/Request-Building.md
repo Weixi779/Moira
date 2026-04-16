@@ -7,8 +7,9 @@ Moira 提供了一套完整的 `URLRequest` 组装流程，目标是让构建过
 ## URL 解析
 
 - 先取 `target.baseURL`，为空时使用 Provider 的 baseURL。
-- `path` 相对 baseURL 解析。
-- `payload.query` 转为 URL query items。
+- `path` 会被视为 endpoint path，并追加到 baseURL 当前 path 之后。
+- `path` 即使以 `/` 开头，也不会回退到 host 根路径。
+- 如果 baseURL 已经带有 query，`payload.query` 会按顺序追加在后面，不做去重。
 
 ## Header 与超时
 

@@ -23,6 +23,8 @@ Defaults:
 - `timeout = 60`
 - `payload = RequestPayload()`
 
+`path` is an endpoint path appended to the resolved base URL path. A leading `/` does not reset to the host root.
+
 Note: `execution` has no default value. Every conformer must declare `.request` or `.upload(...)` explicitly.
 
 ## RequestExecution

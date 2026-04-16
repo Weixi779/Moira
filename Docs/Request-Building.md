@@ -7,8 +7,9 @@ Moira provides a complete flow for assembling `URLRequest`s. The goal is to make
 ## URL resolution
 
 - Uses `target.baseURL` if present, otherwise the provider base URL.
-- `path` is resolved relative to the base URL.
-- `payload.query` becomes URL query items.
+- `path` is treated as an endpoint path and appended to the base URL path.
+- A leading `/` in `path` is ignored; it does not reset back to the host root.
+- If the base URL already contains query items, `payload.query` is appended after them without deduplication.
 
 ## Headers and timeout
 
