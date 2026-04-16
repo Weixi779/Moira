@@ -74,37 +74,3 @@ public struct RequestPayload: Sendable {
         return copy
     }
 }
-
-/// Upload payload definition consumed by clients.
-public enum UploadSource: Sendable {
-    /// Upload raw data.
-    case data(Data)
-    /// Upload from a file URL.
-    case file(URL)
-    /// Upload multipart form parts.
-    case multipart([MultipartFormPart])
-}
-
-/// A single multipart form field.
-public struct MultipartFormPart: Sendable {
-    /// Field name in the multipart form.
-    public let name: String
-    /// Raw field data.
-    public let data: Data
-    /// Optional file name for file parts.
-    public let fileName: String?
-    /// Optional MIME type for the part.
-    public let mimeType: String?
-
-    public init(
-        name: String,
-        data: Data,
-        fileName: String? = nil,
-        mimeType: String? = nil
-    ) {
-        self.name = name
-        self.data = data
-        self.fileName = fileName
-        self.mimeType = mimeType
-    }
-}

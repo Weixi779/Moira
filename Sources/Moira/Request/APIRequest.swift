@@ -1,13 +1,5 @@
 import Foundation
 
-/// Execution mode for a request.
-public enum RequestExecution: Sendable {
-    /// A regular HTTP request.
-    case request
-    /// An upload request with the given source.
-    case upload(UploadSource)
-}
-
 /// Describes a request that can be built into a `URLRequest`.
 public protocol APIRequest: Sendable {
     /// Path relative to the base URL.
