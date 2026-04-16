@@ -2,7 +2,7 @@
 
 Moira provides a complete flow for assembling `URLRequest`s. The goal is to make request building API-like and semantic without forcing a specific architecture. It stays close to native `URLRequest` composition, favors simple reuse, and models only the most common HTTP concepts even if there are multiple pieces.
 
-`URLRequestBuilder` converts `APIRequest` into `URLRequest` with a fixed, predictable set of rules.
+`URLRequestBuilder` converts `APIRequest` into `URLRequest` with a fixed, predictable set of rules. `APIProvider` accepts any `URLRequestBuilding` implementation, and `URLRequestBuilder` is the default one.
 
 ## URL resolution
 

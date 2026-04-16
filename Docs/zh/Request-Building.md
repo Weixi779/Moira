@@ -2,7 +2,7 @@
 
 Moira 提供了一套完整的 `URLRequest` 组装流程，目标是让构建过程更 API 化、更语义化，但不强制你依赖某种架构。它尽量贴近原生 `URLRequest` 的拼装方式，强调简单复用，并只抽象出最常见的 HTTP 概念，即使看起来组件数量不少。
 
-`URLRequestBuilder` 负责将 `APIRequest` 转为 `URLRequest`，规则固定且可预期。
+`URLRequestBuilder` 负责将 `APIRequest` 转为 `URLRequest`，规则固定且可预期。`APIProvider` 也接受任意 `URLRequestBuilding` 实现，而 `URLRequestBuilder` 是默认提供的那一个。
 
 ## URL 解析
 
