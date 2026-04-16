@@ -24,51 +24,67 @@ public struct RequestPayload: Sendable {
         self.body = body
     }
 
+    // MARK: - Static Factories
+
+    /// Creates a payload with a single query item.
+    public static func query(_ name: String, _ value: String?) -> Self {
+        Self(query: [URLQueryItem(name: name, value: value)])
+    }
+
+    /// Creates a payload with multiple query items.
+    public static func queries(_ items: [URLQueryItem]) -> Self {
+        Self(query: items)
+    }
+
+    /// Creates a payload with a JSON body.
+    public static func json(_ body: some Encodable & Sendable) -> Self {
+        Self(body: .json(AnyJSONEncodable(body)))
+    }
+
+    /// Creates a payload with a URL-encoded form body.
+    public static func formEncoded(_ items: [URLQueryItem]) -> Self {
+        Self(body: .urlEncodedForm(items))
+    }
+
+    /// Creates a payload with raw body data.
+    public static func data(_ data: Data) -> Self {
+        Self(body: .data(data))
+    }
+
+    // MARK: - Chaining (Query — always appends)
+
     /// Returns a payload with an appended query item.
-    public func appendingQueryItem(_ item: URLQueryItem) -> Self {
+    public func query(_ name: String, _ value: String?) -> Self {
         var copy = self
-        copy.query.append(item)
+        copy.query.append(URLQueryItem(name: name, value: value))
         return copy
     }
 
     /// Returns a payload with appended query items.
-    public func appendingQueryItems(_ items: [URLQueryItem]) -> Self {
+    public func queries(_ items: [URLQueryItem]) -> Self {
         var copy = self
         copy.query.append(contentsOf: items)
         return copy
     }
 
-    /// Returns a payload with a query item replaced by name.
-    public func replacingQueryItem(_ item: URLQueryItem) -> Self {
-        var copy = self
-        copy.query.removeAll { $0.name == item.name }
-        copy.query.append(item)
-        return copy
-    }
-
-    /// Returns a payload with query items replaced.
-    public func replacingQueryItems(_ items: [URLQueryItem]) -> Self {
-        var copy = self
-        copy.query = items
-        return copy
-    }
+    // MARK: - Chaining (Body — sets/overrides)
 
     /// Returns a payload with a JSON body.
-    public func withJSON(_ body: some Encodable & Sendable) -> Self {
+    public func json(_ body: some Encodable & Sendable) -> Self {
         var copy = self
         copy.body = .json(AnyJSONEncodable(body))
         return copy
     }
 
     /// Returns a payload with a URL-encoded form body.
-    public func withURLEncodedForm(_ items: [URLQueryItem]) -> Self {
+    public func formEncoded(_ items: [URLQueryItem]) -> Self {
         var copy = self
         copy.body = .urlEncodedForm(items)
         return copy
     }
 
     /// Returns a payload with raw body data.
-    public func withData(_ data: Data) -> Self {
+    public func data(_ data: Data) -> Self {
         var copy = self
         copy.body = .data(data)
         return copy
