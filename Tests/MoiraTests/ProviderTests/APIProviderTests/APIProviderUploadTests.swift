@@ -126,7 +126,7 @@ struct APIProviderUploadTests {
         let provider = APIProvider(client: client, builder: Support.makeBuilder())
         let request = Support.SimpleRequest(
             method: .post,
-            payload: RequestPayload().withData(Data([0x01])),
+            payload: .data(Data([0x01])),
             execution: .upload(.data(Data([0x02])))
         )
 

@@ -56,10 +56,7 @@ struct APIProviderIntegrationTests {
     func getRequestReturnsArgs() async throws {
         let builder = URLRequestBuilder(baseURL: IntegrationConfig.baseURL)
         let provider = APIProvider(client: AlamofireClient(), builder: builder)
-        let payload = RequestPayload(query: [
-            URLQueryItem(name: "q", value: "moira"),
-        ])
-        let request = SimpleRequest(path: "/get", payload: payload)
+        let request = SimpleRequest(path: "/get", payload: .query("q", "moira"))
 
         let response: GetResponse = try await provider.request(request)
         #expect(response.args["q"] == "moira")
@@ -69,8 +66,7 @@ struct APIProviderIntegrationTests {
     func postJSONBodyEchoesJSON() async throws {
         let builder = URLRequestBuilder(baseURL: IntegrationConfig.baseURL)
         let provider = APIProvider(client: AlamofireClient(), builder: builder)
-        let payload = RequestPayload().withJSON(Payload(message: "hello"))
-        let request = SimpleRequest(path: "/post", method: .post, payload: payload)
+        let request = SimpleRequest(path: "/post", method: .post, payload: .json(Payload(message: "hello")))
 
         let response: PostResponse = try await provider.request(request)
         #expect(response.json == Payload(message: "hello"))

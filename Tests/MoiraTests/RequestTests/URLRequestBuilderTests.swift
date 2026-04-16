@@ -190,9 +190,8 @@ struct URLRequestBuilderTests {
     func buildEncodesJSONBodyAndContentType() throws {
         struct Body: Codable, Sendable, Equatable { let value: String }
         let body = Body(value: "ok")
-        let payload = RequestPayload().withJSON(body)
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
-        let request = SimpleRequest(method: .post, payload: payload)
+        let request = SimpleRequest(method: .post, payload: .json(body))
 
         let built = try builder.build(request)
         #expect(built.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -204,11 +203,10 @@ struct URLRequestBuilderTests {
     @Test("buildKeepsExistingContentTypeHeader")
     func buildKeepsExistingContentTypeHeader() throws {
         struct Body: Codable, Sendable { let value: String }
-        let payload = RequestPayload().withJSON(Body(value: "ok"))
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             method: .post,
-            payload: payload,
+            payload: .json(Body(value: "ok")),
             headers: ["Content-Type": "application/custom"]
         )
 
@@ -222,9 +220,8 @@ struct URLRequestBuilderTests {
             URLQueryItem(name: "a", value: "1"),
             URLQueryItem(name: "b", value: "2"),
         ]
-        let payload = RequestPayload().withURLEncodedForm(items)
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
-        let request = SimpleRequest(method: .post, payload: payload)
+        let request = SimpleRequest(method: .post, payload: .formEncoded(items))
 
         let built = try builder.build(request)
         #expect(built.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded; charset=utf-8")
@@ -239,9 +236,8 @@ struct URLRequestBuilderTests {
     @Test("buildEncodesDataBody")
     func buildEncodesDataBody() throws {
         let data = Data([0x01, 0x02])
-        let payload = RequestPayload().withData(data)
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
-        let request = SimpleRequest(method: .post, payload: payload)
+        let request = SimpleRequest(method: .post, payload: .data(data))
 
         let built = try builder.build(request)
         #expect(built.value(forHTTPHeaderField: "Content-Type") == "application/octet-stream")
@@ -282,7 +278,7 @@ struct URLRequestBuilderTests {
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             method: .post,
-            payload: RequestPayload().withData(Data([0x01])),
+            payload: .data(Data([0x01])),
             execution: .upload(.data(Data([0x02])))
         )
 
