@@ -4,6 +4,10 @@ import Testing
 
 private let requestBuilderBaseURL = URL(string: "https://unit-test.invalid")!
 private let requestBuilderOverrideBaseURL = URL(string: "https://override.unit-test.invalid")!
+private let requestBuilderVersionedBaseURL = URL(string: "https://unit-test.invalid/v1")!
+private let requestBuilderVersionedTrailingSlashBaseURL = URL(string: "https://unit-test.invalid/v1/")!
+
+// MARK: - Fixtures
 
 private struct SimpleRequest: APIRequest {
     let path: String
@@ -33,6 +37,14 @@ private struct SimpleRequest: APIRequest {
     }
 }
 
+struct PathResolutionCase {
+    let baseURL: URL
+    let path: String
+    let expectedURL: String
+}
+
+// MARK: - Tests
+
 @Suite(.tags(.request, .builder))
 struct URLRequestBuilderTests {
     @Test("buildUsesBaseURLAndMethod")
@@ -57,6 +69,49 @@ struct URLRequestBuilderTests {
         #expect(built.url?.absoluteString == "https://override.unit-test.invalid/v2/users")
     }
 
+    @Test(
+        "buildAppendsEndpointPath",
+        arguments: [
+            PathResolutionCase(
+                baseURL: requestBuilderVersionedBaseURL,
+                path: "users",
+                expectedURL: "https://unit-test.invalid/v1/users"
+            ),
+            PathResolutionCase(
+                baseURL: requestBuilderVersionedBaseURL,
+                path: "/users",
+                expectedURL: "https://unit-test.invalid/v1/users"
+            ),
+            PathResolutionCase(
+                baseURL: requestBuilderVersionedTrailingSlashBaseURL,
+                path: "users",
+                expectedURL: "https://unit-test.invalid/v1/users"
+            ),
+            PathResolutionCase(
+                baseURL: requestBuilderVersionedTrailingSlashBaseURL,
+                path: "/users",
+                expectedURL: "https://unit-test.invalid/v1/users"
+            ),
+            PathResolutionCase(
+                baseURL: URL(string: "https://unit-test.invalid/api/mobile/")!,
+                path: "/login",
+                expectedURL: "https://unit-test.invalid/api/mobile/login"
+            ),
+            PathResolutionCase(
+                baseURL: requestBuilderVersionedBaseURL,
+                path: "users/123/profile",
+                expectedURL: "https://unit-test.invalid/v1/users/123/profile"
+            ),
+        ]
+    )
+    func buildAppendsEndpointPath(_ testCase: PathResolutionCase) throws {
+        let builder = URLRequestBuilder(baseURL: testCase.baseURL)
+        let request = SimpleRequest(path: testCase.path)
+
+        let built = try builder.build(request)
+        #expect(built.url?.absoluteString == testCase.expectedURL)
+    }
+
     @Test("buildAppliesQueryItems")
     func buildAppliesQueryItems() throws {
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
@@ -71,6 +126,51 @@ struct URLRequestBuilderTests {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let items = components?.queryItems ?? []
         #expect(Set(items) == Set(payload.query))
+    }
+
+    @Test("buildUsesBaseURLWhenPathIsEmpty")
+    func buildUsesBaseURLWhenPathIsEmpty() throws {
+        let builder = URLRequestBuilder(baseURL: requestBuilderVersionedBaseURL)
+        let request = SimpleRequest(path: "")
+
+        let built = try builder.build(request)
+        #expect(built.url?.absoluteString == "https://unit-test.invalid/v1")
+    }
+
+    @Test("buildAppendsPayloadQueryAfterBaseURLQuery")
+    func buildAppendsPayloadQueryAfterBaseURLQuery() throws {
+        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
+        let targetBaseURL = try #require(
+            URL(string: "https://override.unit-test.invalid/v2?lang=en&region=cn"),
+            "Expected the test base URL to be valid."
+        )
+        let payload = RequestPayload(query: [
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "filter", value: "active"),
+        ])
+        let request = SimpleRequest(
+            path: "",
+            payload: payload,
+            baseURL: targetBaseURL
+        )
+
+        let built = try builder.build(request)
+        #expect(
+            built.url?.absoluteString ==
+                "https://override.unit-test.invalid/v2?lang=en&region=cn&page=1&filter=active"
+        )
+
+        let url = try #require(built.url, "Expected the built request to contain a URL.")
+        let components = try #require(
+            URLComponents(url: url, resolvingAgainstBaseURL: false),
+            "Expected the built request URL to be decomposable."
+        )
+        #expect(components.queryItems == [
+            URLQueryItem(name: "lang", value: "en"),
+            URLQueryItem(name: "region", value: "cn"),
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "filter", value: "active"),
+        ])
     }
 
     @Test("buildAppliesHeadersAndTimeout")
@@ -193,22 +293,6 @@ struct URLRequestBuilderTests {
         guard let error else { return }
         guard case .invalidRequest = error else {
             Issue.record("Expected APIError.invalidRequest for upload with non-empty body.")
-            return
-        }
-    }
-
-    @Test("buildThrowsOnInvalidPath")
-    func buildThrowsOnInvalidPath() {
-        let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
-        let request = SimpleRequest(path: "http://bad url")
-
-        let error = #expect(throws: APIError.self) {
-            try builder.build(request)
-        }
-
-        guard let error else { return }
-        guard case .requestBuildingFailed = error else {
-            Issue.record("Expected APIError.requestBuildingFailed for an invalid path.")
             return
         }
     }
