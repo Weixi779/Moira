@@ -35,7 +35,7 @@ enum UserAPI: APIRequest {
         case .profile:
             return RequestPayload()
         case .updateProfile(_, let body):
-            return RequestPayload().withJSON(body)
+            return .json(body)
         }
     }
 

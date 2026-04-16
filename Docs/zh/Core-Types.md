@@ -68,10 +68,13 @@ public struct RequestPayload: Sendable {
 }
 ```
 
-便捷方法：
-- `withJSON(_:)`
-- `withURLEncodedForm(_:)`
-- `withData(_:)`
+静态工厂：
+- `.query(_:_:)` / `.queries(_:)`
+- `.json(_:)` / `.formEncoded(_:)` / `.data(_:)`
+
+链式调用（query 追加，body 覆盖）：
+- `.query(_:_:)` / `.queries(_:)`
+- `.json(_:)` / `.formEncoded(_:)` / `.data(_:)`
 
 默认值：
 - `query = []`

@@ -62,9 +62,9 @@ enum UserAPI: APIRequest {
         case .profile:
             return RequestPayload()
         case .search(let query):
-            return RequestPayload().appendingQueryItem(URLQueryItem(name: "q", value: query))
+            return .query("q", query)
         case .updateProfile(_, let body):
-            return RequestPayload().withJSON(body)
+            return .json(body)
         }
     }
 

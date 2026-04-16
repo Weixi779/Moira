@@ -68,10 +68,13 @@ public struct RequestPayload: Sendable {
 }
 ```
 
-Convenience:
-- `withJSON(_:)`
-- `withURLEncodedForm(_:)`
-- `withData(_:)`
+Static factories:
+- `.query(_:_:)` / `.queries(_:)`
+- `.json(_:)` / `.formEncoded(_:)` / `.data(_:)`
+
+Chaining (query appends, body overrides):
+- `.query(_:_:)` / `.queries(_:)`
+- `.json(_:)` / `.formEncoded(_:)` / `.data(_:)`
 
 Defaults:
 - `query = []`
