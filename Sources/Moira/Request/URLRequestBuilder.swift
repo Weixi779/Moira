@@ -14,70 +14,134 @@ public struct URLRequestBuilder: Sendable {
         try validateExecution(target)
 
         let url = try buildURL(for: target)
+
         var request = URLRequest(url: url)
         request.httpMethod = target.method.rawValue
         request.timeoutInterval = target.timeout
         request.applyHeaders(target.headers)
-        try applyBody(target.payload.body, to: &request)
-        applyUploadContentType(target.execution, to: &request)
+
+        try applyBody(target.payload.body, execution: target.execution, to: &request)
+
         return request
     }
 }
 
+// MARK: - Validation
+
 private extension URLRequestBuilder {
     /// Validates that upload requests do not carry a payload body.
     func validateExecution(_ target: any APIRequest) throws {
-        if case .upload = target.execution, case .none = target.payload.body {
-            return
-        }
-        if case .upload = target.execution {
+        switch (target.execution, target.payload.body) {
+        case (.upload, .none):
+            break
+        case (.upload, _):
             throw APIError.invalidRequest("Upload requests must use payload.body == .none.")
-        }
-    }
-
-    /// Sets a default Content-Type for non-multipart upload sources.
-    func applyUploadContentType(_ execution: RequestExecution, to request: inout URLRequest) {
-        guard case let .upload(source) = execution else { return }
-        switch source {
-        case .data, .file:
-            request.setContentTypeIfNeeded("application/octet-stream")
-        case .multipart:
+        default:
             break
-        }
-    }
-
-    /// Resolves the final URL with base URL, path, and query items.
-    func buildURL(for target: any APIRequest) throws -> URL {
-        let resolvedBaseURL = target.baseURL ?? baseURL
-        guard var url = URL(string: target.path, relativeTo: resolvedBaseURL) else {
-            throw APIError.requestBuildingFailed("Invalid path: \(target.path)")
-        }
-
-        if !target.payload.query.isEmpty {
-            url.append(queryItems: target.payload.query)
-        }
-        return url
-    }
-
-    /// Encodes the request body and sets the `Content-Type` header if needed.
-    func applyBody(_ body: RequestPayload.Body, to request: inout URLRequest) throws {
-        switch body {
-        case .none:
-            break
-        case let .json(encodable):
-            let encoder = JSONEncoder()
-            let data = try encodable.encode(using: encoder)
-            request.httpBody = data
-            request.setContentTypeIfNeeded("application/json")
-        case let .urlEncodedForm(items):
-            request.httpBody = items.formEncodedString.data(using: .utf8)
-            request.setContentTypeIfNeeded("application/x-www-form-urlencoded; charset=utf-8")
-        case let .data(data):
-            request.httpBody = data
-            request.setContentTypeIfNeeded("application/octet-stream")
         }
     }
 }
+
+// MARK: - URL Resolution
+
+private extension URLRequestBuilder {
+    /// Resolves the final URL with base URL, path, and query items.
+    func buildURL(for target: any APIRequest) throws -> URL {
+        let base = target.baseURL ?? baseURL
+        let pathURL = appendingEndpointPath(target.path, to: base)
+        return try appendingQuery(target.payload.query, to: pathURL)
+    }
+
+    /// Appends an endpoint path onto the base URL path.
+    func appendingEndpointPath(_ path: String, to base: URL) -> URL {
+        let endpointPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        guard !endpointPath.isEmpty else { return base }
+        return base.appendingPathComponent(endpointPath)
+    }
+
+    /// Appends payload query items after any existing URL query items.
+    func appendingQuery(_ items: [URLQueryItem], to url: URL) throws -> URL {
+        guard !items.isEmpty else { return url }
+
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
+            throw APIError.requestBuildingFailed("Invalid URL for components: \(url.absoluteString)")
+        }
+
+        let baseQueryItems = components.queryItems ?? []
+        components.queryItems = baseQueryItems + items
+
+        guard let finalURL = components.url else {
+            throw APIError.requestBuildingFailed("Failed to generate URL with query items.")
+        }
+        return finalURL
+    }
+}
+
+// MARK: - Request Construction
+
+private extension URLRequestBuilder {
+    /// Encodes the request body and sets the `Content-Type` header if needed.
+    func applyBody(
+        _ body: RequestPayload.Body,
+        execution: RequestExecution,
+        to request: inout URLRequest
+    ) throws {
+        request.httpBody = try body.bodyData()
+
+        if let contentType = resolvedContentType(for: body, execution: execution) {
+            request.ensureContentType(contentType)
+        }
+    }
+
+    /// Resolves the preferred `Content-Type` from the body or upload source.
+    func resolvedContentType(for body: RequestPayload.Body, execution: RequestExecution) -> String? {
+        if let contentType = body.contentType {
+            return contentType
+        }
+
+        guard case let .upload(source) = execution else { return nil }
+        switch source {
+        case .data, .file:
+            return "application/octet-stream"
+        case .multipart:
+            return nil
+        }
+    }
+}
+
+// MARK: - RequestPayload.Body Helpers
+
+private extension RequestPayload.Body {
+    /// Encodes the request body into raw data.
+    func bodyData() throws -> Data? {
+        switch self {
+        case .none:
+            return nil
+        case let .json(encodable):
+            return try encodable.encode(using: JSONEncoder())
+        case let .urlEncodedForm(items):
+            return Data(items.formEncodedString.utf8)
+        case let .data(data):
+            return data
+        }
+    }
+
+    /// Returns the default `Content-Type` for a request body.
+    var contentType: String? {
+        switch self {
+        case .none:
+            return nil
+        case .json:
+            return "application/json"
+        case .urlEncodedForm:
+            return "application/x-www-form-urlencoded; charset=utf-8"
+        case .data:
+            return "application/octet-stream"
+        }
+    }
+}
+
+// MARK: - URLRequest Helpers
 
 private extension URLRequest {
     /// Applies additional headers onto a request.
@@ -89,12 +153,14 @@ private extension URLRequest {
     }
 
     /// Sets the content type only when the header is missing.
-    mutating func setContentTypeIfNeeded(_ contentType: String) {
+    mutating func ensureContentType(_ contentType: String) {
         if value(forHTTPHeaderField: "Content-Type") == nil {
             setValue(contentType, forHTTPHeaderField: "Content-Type")
         }
     }
 }
+
+// MARK: - URLQueryItem Helpers
 
 private extension [URLQueryItem] {
     /// Encodes query items as `application/x-www-form-urlencoded`.

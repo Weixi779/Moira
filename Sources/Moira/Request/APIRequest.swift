@@ -2,7 +2,7 @@ import Foundation
 
 /// Describes a request that can be built into a `URLRequest`.
 public protocol APIRequest: Sendable {
-    /// Path relative to the base URL.
+    /// Endpoint path appended to the base URL path.
     var path: String { get }
     /// HTTP method for the request.
     var method: RequestMethod { get }
