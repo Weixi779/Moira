@@ -1,7 +1,7 @@
 import Foundation
 
 /// Builds `URLRequest` instances from `APIRequest` values.
-public struct URLRequestBuilder: Sendable {
+public struct URLRequestBuilder: URLRequestBuilding, Sendable {
     public let baseURL: URL
 
     /// Creates a builder with the base URL used for resolving paths.
