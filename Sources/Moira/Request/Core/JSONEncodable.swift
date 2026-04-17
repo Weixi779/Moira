@@ -7,14 +7,14 @@ public protocol JSONEncodable: Sendable {
 }
 
 /// Type-erased wrapper for `Encodable` values.
-public struct AnyJSONEncodable<T: Encodable & Sendable>: JSONEncodable {
+struct AnyJSONEncodable<T: Encodable & Sendable>: JSONEncodable {
     private let value: T
 
-    public init(_ value: T) {
+    init(_ value: T) {
         self.value = value
     }
 
-    public func encode(using encoder: JSONEncoder) throws -> Data {
+    func encode(using encoder: JSONEncoder) throws -> Data {
         try encoder.encode(value)
     }
 }
