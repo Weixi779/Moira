@@ -88,11 +88,9 @@ public struct RequestPayload: Sendable {
 public protocol JSONEncodable: Sendable {
     func encode(using encoder: JSONEncoder) throws -> Data
 }
-
-public struct AnyJSONEncodable<T: Encodable & Sendable>: JSONEncodable {
-    public init(_ value: T)
-}
 ```
+
+`RequestPayload.json(_:)` 可以直接接收常规的 `Encodable & Sendable` 值；大多数使用场景下不需要直接接触 `JSONEncodable`。
 
 ## UploadSource
 

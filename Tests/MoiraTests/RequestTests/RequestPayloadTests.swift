@@ -26,9 +26,10 @@ struct RequestPayloadTests {
     @Test("init with query and body")
     func initWithQueryAndBody() throws {
         let body = SampleBody(name: "moira", count: 1)
+        let jsonBody = RequestPayload.json(body).body
         let payload = RequestPayload(
             query: [URLQueryItem(name: "page", value: "1")],
-            body: .json(AnyJSONEncodable(body))
+            body: jsonBody
         )
 
         #expect(payload.query == [URLQueryItem(name: "page", value: "1")])

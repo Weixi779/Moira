@@ -88,11 +88,9 @@ Upload payloads are not part of `RequestPayload.Body`. Use `execution: .upload(s
 public protocol JSONEncodable: Sendable {
     func encode(using encoder: JSONEncoder) throws -> Data
 }
-
-public struct AnyJSONEncodable<T: Encodable & Sendable>: JSONEncodable {
-    public init(_ value: T)
-}
 ```
+
+`RequestPayload.json(_:)` accepts regular `Encodable & Sendable` values directly. Most consumers do not need to use `JSONEncodable` themselves.
 
 ## UploadSource
 

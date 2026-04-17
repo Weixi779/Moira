@@ -87,14 +87,12 @@ let user: User = try await provider.request(UserAPI.profile(id: "123"))
 ## Payload 示例
 
 ```swift
-let queryPayload = RequestPayload()
-    .appendingQueryItems([URLQueryItem(name: "page", value: "1")])
+let queryPayload: RequestPayload = .query("page", "1")
+    .query("sort", "name")
 
-let formPayload = RequestPayload()
-    .withURLEncodedForm([URLQueryItem(name: "q", value: "swift")])
+let formPayload: RequestPayload = .formEncoded([URLQueryItem(name: "q", value: "swift")])
 
-let dataPayload = RequestPayload()
-    .withData(Data("raw".utf8))
+let dataPayload: RequestPayload = .data(Data("raw".utf8))
 ```
 
 ## 获取原始响应
