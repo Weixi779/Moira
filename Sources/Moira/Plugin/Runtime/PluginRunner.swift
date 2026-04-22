@@ -6,13 +6,10 @@ public struct PluginRunner: Sendable {
     public let transformPlugins: [TransformPlugin]
     /// Observer plugins executed concurrently.
     public let observerPlugins: [ObserverPlugin]
-    /// Short-circuit plugins evaluated in order.
-    public let shortCircuitPlugins: [ShortCircuitPlugin]
 
     public init(plugins: [any RequestPlugin]) {
         self.transformPlugins = plugins.compactMap { $0 as? TransformPlugin }
         self.observerPlugins = plugins.compactMap { $0 as? ObserverPlugin }
-        self.shortCircuitPlugins = plugins.compactMap { $0 as? ShortCircuitPlugin }
     }
 }
 
@@ -73,19 +70,5 @@ extension PluginRunner: ObserverPlugin {
                 }
             }
         }
-    }
-}
-
-extension PluginRunner: ShortCircuitPlugin {
-    /// Returns the first short-circuit decision that is not `.miss`.
-    public func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision {
-        for plugin in shortCircuitPlugins {
-            let decision = await plugin.evaluate(snapshot: snapshot)
-            if case .miss = decision {
-                continue
-            }
-            return decision
-        }
-        return .miss
     }
 }

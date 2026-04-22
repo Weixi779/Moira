@@ -28,12 +28,6 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     public func request(_ target: any APIRequest) async throws -> APIResponse {
         do {
             let pipeline = try await preparePipeline(for: target)
-
-            let decision = await runner.evaluate(snapshot: pipeline.snapshot)
-            if let response = try await handleShortCircuitDecision(decision, context: pipeline.context) {
-                return response
-            }
-
             return try await execute(pipeline)
         } catch {
             if error is CancellationError {
@@ -69,14 +63,6 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
             guard case let .upload(source) = pipeline.prepared.execution else {
                 throw APIError.invalidRequest("uploadTask requires execution == .upload.")
             }
-
-            let decision = await runner.evaluate(snapshot: pipeline.snapshot)
-            if let response = try await handleShortCircuitDecision(decision, context: pipeline.context) {
-                let (stream, continuation) = AsyncStream<UploadProgress>.makeStream()
-                continuation.finish()
-                return UploadTask(progress: stream) { response }
-            }
-
             return try await executeUpload(source: source, request: pipeline.request, context: pipeline.context)
         } catch {
             if error is CancellationError {
@@ -110,7 +96,6 @@ private extension APIProvider {
         let prepared: any APIRequest
         let request: URLRequest
         let context: RequestContext
-        let snapshot: RequestContext.Snapshot
     }
 
     /// Builds and adapts the request, then notifies observers.
@@ -122,13 +107,11 @@ private extension APIProvider {
 
         await notifyWillSend(context: context)
 
-        let snapshot = await context.snapshot()
         return Pipeline(
             target: target,
             prepared: prepared,
             request: adapted,
-            context: context,
-            snapshot: snapshot
+            context: context
         )
     }
 
@@ -211,13 +194,6 @@ private extension APIProvider {
                         current: currentRequest,
                         context: context
                     )
-                    let retryDecision = await runner.evaluate(snapshot: context.snapshot())
-                    if let shortCircuitResponse = try await handleShortCircuitDecision(
-                        retryDecision,
-                        context: context
-                    ) {
-                        return shortCircuitResponse
-                    }
                     continue
                 case let .retryAfter(delay):
                     await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
@@ -228,13 +204,6 @@ private extension APIProvider {
                         current: currentRequest,
                         context: context
                     )
-                    let retryDecision = await runner.evaluate(snapshot: context.snapshot())
-                    if let shortCircuitResponse = try await handleShortCircuitDecision(
-                        retryDecision,
-                        context: context
-                    ) {
-                        return shortCircuitResponse
-                    }
                     continue
                 case .doNotRetry:
                     await self.notifyDidFail(context: context)
@@ -298,24 +267,6 @@ private extension APIProvider {
         let built = try builder.build(prepared)
         let adapted = try await runner.adaptRequest(built)
         return (prepared, adapted)
-    }
-
-    func handleShortCircuitDecision(
-        _ decision: ShortCircuitDecision,
-        context: RequestContext
-    ) async throws -> APIResponse? {
-        switch decision {
-        case let .hitResult(response, _):
-            let processed = try await self.processResponse(response, context: context)
-            await self.notifyDidReceive(context: context)
-            return processed
-        case let .hitError(error, _):
-            await context.updateError(error)
-            await self.notifyDidFail(context: context)
-            throw error
-        case .miss:
-            return nil
-        }
     }
 
     /// Ensures errors are surfaced as `APIError`.
