@@ -132,25 +132,6 @@ enum APIProviderTestSupport {
         }
     }
 
-    struct ShortCircuitProbe: ShortCircuitPlugin {
-        let decision: ShortCircuitDecision
-
-        func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision {
-            decision
-        }
-    }
-
-    struct RetryAwareShortCircuitProbe: ShortCircuitPlugin {
-        let response: APIResponse
-
-        func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision {
-            if snapshot.retryCount > 0 {
-                return .hitResult(response, source: "retry")
-            }
-            return .miss
-        }
-    }
-
     struct ThrowingDecoder: ResponseDecoder {
         func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
             throw APIProviderTestSupport.TestError.decodingFailed

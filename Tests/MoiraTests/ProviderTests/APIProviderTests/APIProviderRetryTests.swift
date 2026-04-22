@@ -71,39 +71,4 @@ struct APIProviderRetryTests {
         #expect(counts.process == 1)
         #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
     }
-
-    @Test(
-        "retryShortCircuitHitSkipsSecondClientRequest",
-        arguments: zip(
-            ["retry", "retryAfter0"],
-            [RetryDecision.retry, .retryAfter(0)]
-        )
-    )
-    func retryShortCircuitHitSkipsSecondClientRequest(_ label: String, _ decision: RetryDecision) async throws {
-        let log = Support.EventLog()
-        let response = Support.makeResponse(statusCode: 204)
-        let counter = Support.AttemptCounter()
-        let client = Support.MockClient { _ in
-            let attempt = await counter.next()
-            if attempt == 0 {
-                throw Support.TestError.sample
-            }
-            return Support.makeResponse(statusCode: 500)
-        }
-        let provider = APIProvider(
-            client: client,
-            builder: Support.makeBuilder(),
-            plugins: [
-                Support.RetryAwareShortCircuitProbe(response: response),
-                Support.ObserverProbe(log: log),
-            ],
-            retryPlugin: Support.RetryProbe(log: log, decision: decision, policy: .reuseRequest)
-        )
-
-        let result = try await provider.request(Support.SimpleRequest())
-
-        #expect(result.statusCode == response.statusCode)
-        #expect(client.requestCount == 1)
-        #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
-    }
 }

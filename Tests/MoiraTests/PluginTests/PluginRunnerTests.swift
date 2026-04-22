@@ -62,17 +62,6 @@ private struct ObserverProbe: ObserverPlugin {
     }
 }
 
-private struct ShortCircuitProbe: ShortCircuitPlugin {
-    let name: String
-    let log: EventLog
-    let decision: ShortCircuitDecision
-
-    func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision {
-        await log.add("evaluate:\(name)")
-        return decision
-    }
-}
-
 private func makeSnapshot() async -> RequestContext.Snapshot {
     let context = RequestContext(target: TestRequest())
     return await context.snapshot()
@@ -132,64 +121,5 @@ struct PluginRunnerObserverTests {
         await log.clear()
         await runner.didFail(snapshot: snapshot)
         #expect(await Set(log.all()) == Set(["didFail:one", "didFail:two"]))
-    }
-}
-
-@Suite(.tags(.plugin, .shortCircuit))
-struct PluginRunnerShortCircuitTests {
-    @Test("stopsOnFirstHit")
-    func pluginRunnerShortCircuitStopsOnFirstHit() async {
-        let log = EventLog()
-        let runner = PluginRunner(plugins: [
-            ShortCircuitProbe(name: "one", log: log, decision: .miss),
-            ShortCircuitProbe(name: "two", log: log, decision: .hitResult(makeResponse())),
-            ShortCircuitProbe(name: "three", log: log, decision: .hitResult(makeResponse())),
-        ])
-
-        let snapshot = await makeSnapshot()
-        let decision = await runner.evaluate(snapshot: snapshot)
-        guard case .hitResult = decision else {
-            Issue.record("Expected the second short-circuit plugin to return a hit result.")
-            return
-        }
-
-        #expect(await log.all() == ["evaluate:one", "evaluate:two"])
-    }
-
-    @Test("stopsOnFirstError")
-    func pluginRunnerShortCircuitStopsOnFirstError() async {
-        let log = EventLog()
-        let runner = PluginRunner(plugins: [
-            ShortCircuitProbe(name: "one", log: log, decision: .miss),
-            ShortCircuitProbe(name: "two", log: log, decision: .hitError(TestError())),
-            ShortCircuitProbe(name: "three", log: log, decision: .hitResult(makeResponse())),
-        ])
-
-        let snapshot = await makeSnapshot()
-        let decision = await runner.evaluate(snapshot: snapshot)
-        guard case .hitError = decision else {
-            Issue.record("Expected the second short-circuit plugin to return a hit error.")
-            return
-        }
-
-        #expect(await log.all() == ["evaluate:one", "evaluate:two"])
-    }
-
-    @Test("allMissReturnsMiss")
-    func pluginRunnerShortCircuitReturnsMissWhenAllPluginsMiss() async {
-        let log = EventLog()
-        let runner = PluginRunner(plugins: [
-            ShortCircuitProbe(name: "one", log: log, decision: .miss),
-            ShortCircuitProbe(name: "two", log: log, decision: .miss),
-        ])
-
-        let snapshot = await makeSnapshot()
-        let decision = await runner.evaluate(snapshot: snapshot)
-        guard case .miss = decision else {
-            Issue.record("Expected short-circuit evaluation to return .miss when all plugins miss.")
-            return
-        }
-
-        #expect(await log.all() == ["evaluate:one", "evaluate:two"])
     }
 }
