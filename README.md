@@ -23,7 +23,7 @@ Design background: [「iOS」网络层工程范式迁移](https://weixi779.githu
 
 - Request description: `APIRequest` + `RequestPayload`
 - Predictable build rules: `URLRequestBuilder`
-- Pluggable lifecycle: Transform / Observer / Retry / ShortCircuit
+- Pluggable lifecycle: Transform / Observer / Retry
 - Default decoding via `ResponseDecoder`
 - Upload with progress via `UploadTask<APIResponse>`
 
@@ -129,6 +129,32 @@ let response = try await task.response()
 print(response.statusCode)
 ```
 
+## Recommended Service Layer
+
+Moira intentionally focuses on `APIRequest` and `APIProvider`. A typical application can add a thin service layer on top and keep mocking at that boundary.
+
+```swift
+protocol UserServicing: Sendable {
+    func profile(id: String) async throws -> User
+}
+
+struct UserService: UserServicing {
+    let requester: any APIRequesting
+
+    func profile(id: String) async throws -> User {
+        try await requester.request(UserAPI.profile(id: id))
+    }
+}
+
+struct MockUserService: UserServicing {
+    let result: Result<User, Error>
+
+    func profile(id: String) async throws -> User {
+        try result.get()
+    }
+}
+```
+
 ## Docs
 
 Moira ships with built-in documentation for both Chinese and English readers.
@@ -144,6 +170,7 @@ Core docs:
 - Request Building: `Docs/Request-Building.md` / `Docs/zh/Request-Building.md`
 - Clients: `Docs/Clients.md` / `Docs/zh/Clients.md`
 - Architecture: `Docs/Architecture.md` / `Docs/zh/Architecture.md`
+- Service Layer Guidance: `Docs/Service-Layer.md` / `Docs/zh/Service-Layer.md`
 
 ## Build & Test
 

@@ -8,22 +8,15 @@ Moira follows a fixed pipeline for every request, so plugin behavior stays predi
 
 ```
 prepare -> build -> adapt -> willSend
-  -> shortCircuit? -> execute -> process -> didReceive
+  -> execute -> process -> didReceive
   -> on error: shouldRetry? -> willRetry -> retry or didFail
 ```
-
-## Short-circuit
-
-- Evaluated after `willSend`.
-- First hit returns immediately.
-- Hit result triggers `didReceive`.
-- Hit error triggers `didFail`.
 
 ## Retry
 
 - Retry decision is evaluated after a failure when a retry plugin is configured.
 - Each retry rebuilds or reuses the request based on policy and re-enters the pipeline.
-- `willSend` and short-circuit plugins run for each retry attempt.
+- `willSend` runs for each retry attempt after the request is rebuilt or reused.
 - `willRetry` is fired before the next attempt.
 - Final failure triggers `didFail` once.
 - Uploads and downloads are not retried by default.

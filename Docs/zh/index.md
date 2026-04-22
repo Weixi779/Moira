@@ -6,6 +6,7 @@
 - 请求构建：`Docs/zh/Request-Building.md`
 - Client 适配：`Docs/zh/Clients.md`
 - 生命周期模型：`Docs/zh/Architecture.md`
+- Service 层建议：`Docs/zh/Service-Layer.md`
 
 英文文档在 `Docs/`：
 - `Docs/index.md`

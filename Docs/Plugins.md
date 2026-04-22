@@ -1,6 +1,6 @@
 # Plugins
 
-Moira splits plugins into four roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform, observer, and short-circuit plugins. Retry is configured separately.
+Moira splits plugins into three roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform and observer plugins. Retry is configured separately.
 
 ## TransformPlugin
 
@@ -56,28 +56,11 @@ public protocol RetryPlugin: Sendable {
 
 Retry plugins are passed via `APIProvider(retryPlugin:)` and are optional.
 
-## ShortCircuitPlugin
-
-Use for cache, mock, or prebuilt responses.
-
-```swift
-public enum ShortCircuitDecision: Sendable {
-    case miss
-    case hitResult(APIResponse, source: String? = nil)
-    case hitError(Error, source: String? = nil)
-}
-
-public protocol ShortCircuitPlugin: RequestPlugin {
-    func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision
-}
-```
-
 ## Execution behavior
 
 - Transform: runs in order, sequential.
 - Observer: runs concurrently.
 - Retry: optional plugin decides when to retry and how to rebuild requests.
-- ShortCircuit: first hit wins.
 
 ## RequestContext
 

@@ -1,6 +1,6 @@
 # 插件体系
 
-Moira 将插件拆分为四类角色，每类职责清晰且可组合。`RequestPlugin` 是统一的标记协议，Provider 会收集并执行 Transform、Observer、ShortCircuit 插件；Retry 需要单独配置。
+Moira 将插件拆分为三类角色，每类职责清晰且可组合。`RequestPlugin` 是统一的标记协议，Provider 会收集并执行 Transform、Observer 插件；Retry 需要单独配置。
 
 ## TransformPlugin
 
@@ -56,28 +56,11 @@ public protocol RetryPlugin: Sendable {
 
 Retry 插件通过 `APIProvider(retryPlugin:)` 传入，可选配置。
 
-## ShortCircuitPlugin
-
-用于缓存、Mock 或预制响应。
-
-```swift
-public enum ShortCircuitDecision: Sendable {
-    case miss
-    case hitResult(APIResponse, source: String? = nil)
-    case hitError(Error, source: String? = nil)
-}
-
-public protocol ShortCircuitPlugin: RequestPlugin {
-    func evaluate(snapshot: RequestContext.Snapshot) async -> ShortCircuitDecision
-}
-```
-
 ## 执行规则
 
 - Transform：顺序执行。
 - Observer：并发执行。
 - Retry：可选插件决定是否重试以及是否重建请求。
-- ShortCircuit：第一个命中生效。
 
 ## RequestContext
 

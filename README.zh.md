@@ -23,7 +23,7 @@ Moira 是这次迁移后的落地选择：
 
 - 请求描述：`APIRequest` + `RequestPayload`
 - 规则稳定的请求构建：`URLRequestBuilder`
-- 插件体系：Transform / Observer / Retry / ShortCircuit
+- 插件体系：Transform / Observer / Retry
 - 默认解码：`ResponseDecoder`
 - 上传与进度：`UploadTask<APIResponse>`
 
@@ -130,6 +130,32 @@ let response = try await task.response()
 print(response.statusCode)
 ```
 
+## 推荐的 Service 封装
+
+Moira 有意聚焦在 `APIRequest` 和 `APIProvider` 这一层。应用通常只需要在其上补一层很薄的 service，并把 mock 放在 service 边界即可。
+
+```swift
+protocol UserServicing: Sendable {
+    func profile(id: String) async throws -> User
+}
+
+struct UserService: UserServicing {
+    let requester: any APIRequesting
+
+    func profile(id: String) async throws -> User {
+        try await requester.request(UserAPI.profile(id: id))
+    }
+}
+
+struct MockUserService: UserServicing {
+    let result: Result<User, Error>
+
+    func profile(id: String) async throws -> User {
+        try result.get()
+    }
+}
+```
+
 ## 文档
 
 Moira 内置了完整的中英文文档，方便快速落地与深度扩展。
@@ -145,6 +171,7 @@ Moira 内置了完整的中英文文档，方便快速落地与深度扩展。
 - 请求构建：`Docs/Request-Building.md` / `Docs/zh/Request-Building.md`
 - Client 适配：`Docs/Clients.md` / `Docs/zh/Clients.md`
 - 架构设计：`Docs/Architecture.md` / `Docs/zh/Architecture.md`
+- Service 层建议：`Docs/Service-Layer.md` / `Docs/zh/Service-Layer.md`
 
 ## 构建与测试
 
