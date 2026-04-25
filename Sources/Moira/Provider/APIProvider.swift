@@ -6,7 +6,7 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     private let builder: any URLRequestBuilding
     private let runner: PluginRunner
     private let decoder: ResponseDecoder
-    private let retryPlugin: RetryPlugin?
+    private let retryStrategy: any RetryStrategy
 
     /// Creates a provider with a client, builder, and optional plugins.
     public init(
@@ -14,21 +14,20 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
         builder: any URLRequestBuilding,
         decoder: ResponseDecoder = JSONDecoder(),
         plugins: [any RequestPlugin] = [],
-        retryPlugin: RetryPlugin? = nil
+        retryStrategy: any RetryStrategy = NoRetryStrategy()
     ) {
         self.client = client
         self.builder = builder
         self.runner = PluginRunner(plugins: plugins)
         self.decoder = decoder
-        self.retryPlugin = retryPlugin
+        self.retryStrategy = retryStrategy
     }
 
     /// Executes a request and returns the raw response.
     @discardableResult
     public func request(_ target: any APIRequest) async throws -> APIResponse {
         do {
-            let pipeline = try await preparePipeline(for: target)
-            return try await execute(pipeline)
+            return try await executeRequest(target)
         } catch {
             if error is CancellationError {
                 throw error
@@ -98,12 +97,71 @@ private extension APIProvider {
         let context: RequestContext
     }
 
+    /// Executes a regular request through the retry strategy.
+    func executeRequest(_ target: any APIRequest) async throws -> APIResponse {
+        var pipeline = try await preparePipeline(for: target)
+
+        while !Task.isCancelled {
+            do {
+                return try await sendRequest(pipeline.request, context: pipeline.context)
+            } catch {
+                if error is CancellationError {
+                    throw error
+                }
+
+                await recordFailure(error, context: pipeline.context)
+                let snapshot = await pipeline.context.snapshot()
+                let decision = await retryStrategy.shouldRetry(snapshot: snapshot, error: error)
+
+                switch decision {
+                case .doNotRetry:
+                    await notifyDidFail(context: pipeline.context)
+                    throw error
+                case let .retry(behavior):
+                    try await prepareNextRetry(
+                        decision: decision,
+                        snapshot: snapshot,
+                        error: error,
+                        context: pipeline.context
+                    )
+                    pipeline = try await nextPipeline(
+                        behavior: behavior,
+                        target: target,
+                        current: pipeline
+                    )
+                case let .retryAfter(delay, behavior):
+                    try await prepareNextRetry(
+                        decision: decision,
+                        delay: delay,
+                        snapshot: snapshot,
+                        error: error,
+                        context: pipeline.context
+                    )
+                    pipeline = try await nextPipeline(
+                        behavior: behavior,
+                        target: target,
+                        current: pipeline
+                    )
+                }
+            }
+        }
+        throw CancellationError()
+    }
+
     /// Builds and adapts the request, then notifies observers.
-    func preparePipeline(for target: any APIRequest) async throws -> Pipeline {
+    func preparePipeline(
+        for target: any APIRequest,
+        context existingContext: RequestContext? = nil,
+        resetForRetry: Bool = false
+    ) async throws -> Pipeline {
         let (prepared, adapted) = try await buildRequest(for: target)
 
-        let context = RequestContext(target: prepared)
-        await context.updateRequest(adapted)
+        let context = existingContext ?? RequestContext(target: target)
+        if resetForRetry {
+            await context.resetForRetry(request: adapted)
+        } else {
+            await context.updateRequest(adapted)
+        }
 
         await notifyWillSend(context: context)
 
@@ -115,9 +173,32 @@ private extension APIProvider {
         )
     }
 
-    /// Executes the request through the retry-capable path.
-    func execute(_ pipeline: Pipeline) async throws -> APIResponse {
-        try await performWithRetry(target: pipeline.target, request: pipeline.request, context: pipeline.context)
+    /// Prepares the URLRequest for the next retry attempt.
+    func nextPipeline(
+        behavior: RetryRequestBehavior,
+        target: any APIRequest,
+        current: Pipeline
+    ) async throws -> Pipeline {
+        switch behavior {
+        case .reuseRequest:
+            await current.context.resetForRetry(request: current.request)
+            await notifyWillSend(context: current.context)
+            return current
+        case .rebuildRequest:
+            return try await preparePipeline(
+                for: target,
+                context: current.context,
+                resetForRetry: true
+            )
+        }
+    }
+
+    /// Performs the actual transport and successful response handling for a built request.
+    func sendRequest(_ request: URLRequest, context: RequestContext) async throws -> APIResponse {
+        let response = try await client.request(request)
+        let processed = try await processResponse(response, context: context)
+        await notifyDidReceive(context: context)
+        return processed
     }
 
     /// Applies response transforms and stores the response in context.
@@ -150,68 +231,27 @@ private extension APIProvider {
         await runner.didFail(snapshot: snapshot)
     }
 
-    /// Asks retry plugins for a decision.
-    func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
-        guard let retryPlugin else {
-            return .doNotRetry
+    /// Stores failure details for observer and retry snapshots.
+    func recordFailure(_ error: Error, context: RequestContext) async {
+        await context.updateError(error)
+        if let response = Self.response(from: error) {
+            await context.updateResponse(response)
         }
-        return await retryPlugin.shouldRetry(snapshot: snapshot, error: error)
     }
 
-    /// Executes and retries until a final decision is reached.
-    func performWithRetry(
-        target: any APIRequest,
-        request: URLRequest,
+    /// Runs retry side effects before the next attempt starts.
+    func prepareNextRetry(
+        decision: RetryDecision,
+        delay: TimeInterval? = nil,
+        snapshot: RequestContext.Snapshot,
+        error: Error,
         context: RequestContext
-    ) async throws -> APIResponse {
-        var attemptError: Error?
-        var currentRequest = request
-
-        while !Task.isCancelled {
-            do {
-                let response = try await self.client.request(currentRequest)
-                let processed = try await self.processResponse(response, context: context)
-                await self.notifyDidReceive(context: context)
-                return processed
-            } catch {
-                if error is CancellationError {
-                    throw error
-                }
-                attemptError = error
-                await context.updateError(error)
-                if let response = Self.response(from: error) {
-                    await context.updateResponse(response)
-                }
-
-                let snapshot = await context.snapshot()
-                let decision = await self.shouldRetry(snapshot: snapshot, error: error)
-                switch decision {
-                case .retry:
-                    await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
-                    await context.incrementRetryCount()
-                    currentRequest = try await prepareRetryRequest(
-                        target: target,
-                        current: currentRequest,
-                        context: context
-                    )
-                    continue
-                case let .retryAfter(delay):
-                    await retryPlugin?.willRetry(snapshot: snapshot, error: error, decision: decision)
-                    await context.incrementRetryCount()
-                    try await Task.sleep(for: .seconds(delay))
-                    currentRequest = try await prepareRetryRequest(
-                        target: target,
-                        current: currentRequest,
-                        context: context
-                    )
-                    continue
-                case .doNotRetry:
-                    await self.notifyDidFail(context: context)
-                    throw attemptError ?? error
-                }
-            }
+    ) async throws {
+        await retryStrategy.willRetry(snapshot: snapshot, error: error, decision: decision)
+        await context.incrementRetryCount()
+        if let delay {
+            try await Task.sleep(for: .seconds(delay))
         }
-        throw CancellationError()
     }
 
     /// Executes an upload without retry, returning an UploadTask.
@@ -240,26 +280,6 @@ private extension APIProvider {
             }
         }
         return UploadTask(progress: task.progress, response: responseClosure)
-    }
-
-    func prepareRetryRequest(
-        target: any APIRequest,
-        current: URLRequest,
-        context: RequestContext
-    ) async throws -> URLRequest {
-        guard let retryPlugin else {
-            return current
-        }
-        let adapted: URLRequest
-        switch retryPlugin.policy {
-        case .reuseRequest:
-            adapted = current
-        case .rebuildRequest:
-            (_, adapted) = try await buildRequest(for: target)
-        }
-        await context.resetForRetry(request: adapted)
-        await notifyWillSend(context: context)
-        return adapted
     }
 
     func buildRequest(for target: any APIRequest) async throws -> (any APIRequest, URLRequest) {
