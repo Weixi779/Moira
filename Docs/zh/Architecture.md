@@ -14,8 +14,9 @@ prepare -> build -> adapt -> willSend
 
 ## 重试
 
-- 配置 RetryPlugin 时，失败后才会询问是否重试。
-- 每次重试会根据策略重建或复用请求，并重新走完整流程。
+- transport 或原始响应处理失败后，会询问 RetryStrategy 是否重试。
+- 每次重试决策会决定重建或复用请求，然后再次发送。
+- 请求准备、构建、适配以及 typed decode 失败不会触发重试。
 - 每次重试在请求重建或复用后都会重新触发 `willSend`。
 - `willRetry` 在下一次尝试前触发。
 - 最终失败只触发一次 `didFail`。

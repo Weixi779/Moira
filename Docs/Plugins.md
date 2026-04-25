@@ -1,6 +1,6 @@
 # Plugins
 
-Moira splits plugins into three roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform and observer plugins. Retry is configured separately.
+Moira splits plugins into two roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform and observer plugins. Retry is configured separately as a provider strategy.
 
 ## TransformPlugin
 
@@ -31,36 +31,35 @@ public protocol ObserverPlugin: RequestPlugin {
 }
 ```
 
-## RetryPlugin
+## RetryStrategy
 
-Use for retry decisions.
+Use for retry decisions after transport or raw response processing failures.
 
 ```swift
 public enum RetryDecision: Sendable {
     case doNotRetry
-    case retry
-    case retryAfter(TimeInterval)
+    case retry(RetryRequestBehavior)
+    case retryAfter(TimeInterval, RetryRequestBehavior)
 }
 
-public enum RetryPolicy: Sendable {
+public enum RetryRequestBehavior: Sendable {
     case reuseRequest
     case rebuildRequest
 }
 
-public protocol RetryPlugin: Sendable {
-    var policy: RetryPolicy { get }
+public protocol RetryStrategy: Sendable {
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision
     func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async
 }
 ```
 
-Retry plugins are passed via `APIProvider(retryPlugin:)` and are optional.
+Retry strategies are passed via `APIProvider(retryStrategy:)`. If omitted, `NoRetryStrategy` disables retry. Request preparation, building, adaptation, and typed decoding failures are not retried. Each retry decision chooses whether the next attempt reuses the current `URLRequest` or rebuilds it.
 
 ## Execution behavior
 
 - Transform: runs in order, sequential.
 - Observer: runs concurrently.
-- Retry: optional plugin decides when to retry and how to rebuild requests.
+- Retry: provider strategy decides when to retry and whether to rebuild requests.
 
 ## RequestContext
 

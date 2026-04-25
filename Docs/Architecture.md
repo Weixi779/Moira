@@ -14,8 +14,9 @@ prepare -> build -> adapt -> willSend
 
 ## Retry
 
-- Retry decision is evaluated after a failure when a retry plugin is configured.
-- Each retry rebuilds or reuses the request based on policy and re-enters the pipeline.
+- Retry decision is evaluated after transport or raw response processing failure.
+- Each retry decision chooses whether to rebuild or reuse the request before sending again.
+- Request preparation, building, adaptation, and typed decoding failures are not retried.
 - `willSend` runs for each retry attempt after the request is rebuilt or reused.
 - `willRetry` is fired before the next attempt.
 - Final failure triggers `didFail` once.

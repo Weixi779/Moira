@@ -1,6 +1,6 @@
 # 插件体系
 
-Moira 将插件拆分为三类角色，每类职责清晰且可组合。`RequestPlugin` 是统一的标记协议，Provider 会收集并执行 Transform、Observer 插件；Retry 需要单独配置。
+Moira 将插件拆分为两类角色，每类职责清晰且可组合。`RequestPlugin` 是统一的标记协议，Provider 会收集并执行 Transform、Observer 插件；Retry 作为 Provider 策略单独配置。
 
 ## TransformPlugin
 
@@ -31,36 +31,35 @@ public protocol ObserverPlugin: RequestPlugin {
 }
 ```
 
-## RetryPlugin
+## RetryStrategy
 
-用于决定是否重试。
+用于在 transport 或原始响应处理失败后决定是否重试。
 
 ```swift
 public enum RetryDecision: Sendable {
     case doNotRetry
-    case retry
-    case retryAfter(TimeInterval)
+    case retry(RetryRequestBehavior)
+    case retryAfter(TimeInterval, RetryRequestBehavior)
 }
 
-public enum RetryPolicy: Sendable {
+public enum RetryRequestBehavior: Sendable {
     case reuseRequest
     case rebuildRequest
 }
 
-public protocol RetryPlugin: Sendable {
-    var policy: RetryPolicy { get }
+public protocol RetryStrategy: Sendable {
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision
     func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async
 }
 ```
 
-Retry 插件通过 `APIProvider(retryPlugin:)` 传入，可选配置。
+Retry 策略通过 `APIProvider(retryStrategy:)` 传入。未传入时使用 `NoRetryStrategy`，即不重试。请求准备、构建、适配以及 typed decode 失败不会触发重试。每次重试决策都会决定下一次尝试复用当前 `URLRequest`，还是重新构建。
 
 ## 执行规则
 
 - Transform：顺序执行。
 - Observer：并发执行。
-- Retry：可选插件决定是否重试以及是否重建请求。
+- Retry：Provider 策略决定是否重试以及是否重建请求。
 
 ## RequestContext
 

@@ -58,20 +58,16 @@ let provider = APIProvider(client: AlamofireClient(), builder: builder)
 ## Configure retry
 
 ```swift
-struct DefaultRetryPlugin: RetryPlugin {
-    let policy: RetryPolicy = .rebuildRequest
-
+struct DefaultRetryStrategy: RetryStrategy {
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
-        snapshot.retryCount == 0 ? .retry : .doNotRetry
+        snapshot.retryCount == 0 ? .retry(.rebuildRequest) : .doNotRetry
     }
-
-    func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async {}
 }
 
 let provider = APIProvider(
     client: AlamofireClient(),
     builder: builder,
-    retryPlugin: DefaultRetryPlugin()
+    retryStrategy: DefaultRetryStrategy()
 )
 ```
 
