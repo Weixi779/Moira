@@ -117,10 +117,9 @@ enum APIProviderTestSupport {
         }
     }
 
-    struct RetryProbe: RetryPlugin {
+    struct RetryProbe: RetryStrategy {
         let log: EventLog
         let decision: RetryDecision
-        let policy: RetryPolicy
 
         func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
             await log.add("shouldRetry")
@@ -149,6 +148,20 @@ enum APIProviderTestSupport {
 
         func processResponse(_ response: APIResponse) async throws -> APIResponse {
             throw APIProviderTestSupport.TestError.sample
+        }
+    }
+
+    struct ThrowingAdaptProbe: TransformPlugin {
+        func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
+            request
+        }
+
+        func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
+            throw APIProviderTestSupport.TestError.sample
+        }
+
+        func processResponse(_ response: APIResponse) async throws -> APIResponse {
+            response
         }
     }
 

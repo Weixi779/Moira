@@ -50,7 +50,10 @@ struct APIProviderUploadTests {
             client: client,
             builder: Support.makeBuilder(),
             plugins: [Support.ObserverProbe(log: log)],
-            retryPlugin: Support.RetryProbe(log: log, decision: .retry, policy: .reuseRequest)
+            retryStrategy: Support.RetryProbe(
+                log: log,
+                decision: .retry(.rebuildRequest)
+            )
         )
         let request = Support.SimpleRequest(
             method: .post,
