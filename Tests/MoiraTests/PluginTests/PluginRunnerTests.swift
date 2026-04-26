@@ -38,10 +38,24 @@ private struct TransformProbe: TransformPlugin {
         await log.add("adapt:\(name)")
         return request
     }
+}
 
-    func processResponse(_ response: APIResponse) async throws -> APIResponse {
-        await log.add("process:\(name)")
-        return response
+private struct ResponseValidationProbe: ResponseValidationPlugin {
+    let name: String
+    let log: EventLog
+
+    func validateResponse(_ response: APIResponse) async throws {
+        await log.add("validate:\(name)")
+    }
+}
+
+private struct ThrowingResponseValidationProbe: ResponseValidationPlugin {
+    let name: String
+    let log: EventLog
+
+    func validateResponse(_ response: APIResponse) async throws {
+        await log.add("validate:\(name)")
+        throw TestError()
     }
 }
 
@@ -88,14 +102,46 @@ struct PluginRunnerTransformTests {
         let request = TestRequest()
         _ = try await runner.prepareRequest(request)
         _ = try await runner.adaptRequest(URLRequest(url: pluginRunnerBaseURL))
-        _ = try await runner.processResponse(makeResponse())
 
         let events = await log.all()
         #expect(events == [
             "prepare:one", "prepare:two",
             "adapt:one", "adapt:two",
-            "process:one", "process:two",
         ])
+    }
+}
+
+@Suite(.tags(.plugin, .runner))
+struct PluginRunnerResponseValidationTests {
+    @Test("validatesResponsesInOrder")
+    func pluginRunnerValidatesResponsesInOrder() async throws {
+        let log = EventLog()
+        let runner = PluginRunner(plugins: [
+            ResponseValidationProbe(name: "one", log: log),
+            ResponseValidationProbe(name: "two", log: log),
+        ])
+
+        try await runner.validateResponse(makeResponse())
+
+        let events = await log.all()
+        #expect(events == ["validate:one", "validate:two"])
+    }
+
+    @Test("stopsValidationAfterFirstError")
+    func pluginRunnerStopsValidationAfterFirstError() async {
+        let log = EventLog()
+        let runner = PluginRunner(plugins: [
+            ResponseValidationProbe(name: "one", log: log),
+            ThrowingResponseValidationProbe(name: "two", log: log),
+            ResponseValidationProbe(name: "three", log: log),
+        ])
+
+        await #expect(throws: TestError.self) {
+            try await runner.validateResponse(makeResponse())
+        }
+
+        let events = await log.all()
+        #expect(events == ["validate:one", "validate:two"])
     }
 }
 

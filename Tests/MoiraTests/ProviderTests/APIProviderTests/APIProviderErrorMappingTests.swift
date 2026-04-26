@@ -6,8 +6,8 @@ private typealias Support = APIProviderTestSupport
 
 @Suite(.tags(.provider, .request))
 struct APIProviderErrorMappingTests {
-    @Test("requestMapsUnderlyingErrors")
-    func requestMapsUnderlyingErrors() async {
+    @Test("requestPropagatesCustomClientErrors")
+    func requestPropagatesCustomClientErrors() async {
         let log = Support.EventLog()
         let client = Support.MockClient { _ in
             throw Support.TestError.sample
@@ -18,14 +18,8 @@ struct APIProviderErrorMappingTests {
             plugins: [Support.ObserverProbe(log: log)]
         )
 
-        let error = await #expect(throws: APIError.self) {
+        await #expect(throws: Support.TestError.self) {
             try await provider.request(Support.SimpleRequest())
-        }
-
-        guard let error else { return }
-        guard case .underlying = error else {
-            Issue.record("Expected APIError.underlying for client errors.")
-            return
         }
 
         #expect(client.requestCount == 1)
@@ -55,8 +49,8 @@ struct APIProviderErrorMappingTests {
         #expect(snapshotResponse?.data == body)
     }
 
-    @Test("didFailSnapshotIncludesResponseWhenTransformThrows")
-    func didFailSnapshotIncludesResponseWhenTransformThrows() async {
+    @Test("didFailSnapshotIncludesResponseWhenValidationThrows")
+    func didFailSnapshotIncludesResponseWhenValidationThrows() async {
         let capture = Support.ResponseCapture()
         let body = Data("boom".utf8)
         let response = Support.makeResponse(statusCode: 500, data: body)
@@ -67,12 +61,12 @@ struct APIProviderErrorMappingTests {
             client: client,
             builder: Support.makeBuilder(),
             plugins: [
-                Support.ThrowingTransformProbe(),
+                Support.ThrowingResponseValidationProbe(),
                 Support.ResponseCaptureProbe(capture: capture),
             ]
         )
 
-        await #expect(throws: APIError.self) {
+        await #expect(throws: Support.TestError.self) {
             try await provider.request(Support.SimpleRequest())
         }
 

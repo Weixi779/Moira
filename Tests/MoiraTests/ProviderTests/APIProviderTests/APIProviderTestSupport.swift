@@ -137,16 +137,15 @@ enum APIProviderTestSupport {
         }
     }
 
-    struct ThrowingTransformProbe: TransformPlugin {
-        func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
-            request
+    struct ThrowingResponseValidationProbe: ResponseValidationPlugin {
+        let log: EventLog?
+
+        init(log: EventLog? = nil) {
+            self.log = log
         }
 
-        func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
-            request
-        }
-
-        func processResponse(_ response: APIResponse) async throws -> APIResponse {
+        func validateResponse(_ response: APIResponse) async throws {
+            await log?.add("validate")
             throw APIProviderTestSupport.TestError.sample
         }
     }
@@ -158,10 +157,6 @@ enum APIProviderTestSupport {
 
         func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
             throw APIProviderTestSupport.TestError.sample
-        }
-
-        func processResponse(_ response: APIResponse) async throws -> APIResponse {
-            response
         }
     }
 
@@ -183,7 +178,6 @@ enum APIProviderTestSupport {
     actor CountingTransformPlugin: TransformPlugin {
         private var prepareCount = 0
         private var adaptCount = 0
-        private var processCount = 0
 
         func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
             prepareCount += 1
@@ -195,13 +189,35 @@ enum APIProviderTestSupport {
             return request
         }
 
-        func processResponse(_ response: APIResponse) async throws -> APIResponse {
-            processCount += 1
-            return response
+        func counts() -> (prepare: Int, adapt: Int) {
+            (prepareCount, adaptCount)
+        }
+    }
+
+    actor CountingResponseValidationPlugin: ResponseValidationPlugin {
+        private var validationCount = 0
+
+        func validateResponse(_ response: APIResponse) async throws {
+            validationCount += 1
         }
 
-        func counts() -> (prepare: Int, adapt: Int, process: Int) {
-            (prepareCount, adaptCount, processCount)
+        func count() -> Int {
+            validationCount
+        }
+    }
+
+    actor ThrowingOnceResponseValidationPlugin: ResponseValidationPlugin {
+        private var validationCount = 0
+
+        func validateResponse(_ response: APIResponse) async throws {
+            defer { validationCount += 1 }
+            if validationCount == 0 {
+                throw APIProviderTestSupport.TestError.sample
+            }
+        }
+
+        func count() -> Int {
+            validationCount
         }
     }
 

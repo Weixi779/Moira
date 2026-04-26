@@ -70,6 +70,39 @@ struct APIProviderUploadTests {
         #expect(!events.contains("shouldRetry"))
     }
 
+    @Test("uploadValidationFailureDoesNotTriggerRetry")
+    func uploadValidationFailureDoesNotTriggerRetry() async throws {
+        let log = Support.EventLog()
+        let client = Support.MockClient { _ in
+            Support.makeResponse()
+        }
+        let provider = APIProvider(
+            client: client,
+            builder: Support.makeBuilder(),
+            plugins: [
+                Support.ThrowingResponseValidationProbe(log: log),
+                Support.ObserverProbe(log: log),
+            ],
+            retryStrategy: Support.RetryProbe(
+                log: log,
+                decision: .retry(.rebuildRequest)
+            )
+        )
+        let request = Support.SimpleRequest(
+            method: .post,
+            execution: .upload(.data(Data([0x01])))
+        )
+
+        await #expect(throws: Support.TestError.self) {
+            let task = try await provider.uploadTask(request)
+            _ = try await task.response()
+        }
+
+        #expect(client.uploadCount == 1)
+        let events = await log.all()
+        #expect(events == ["willSend", "validate", "didFail"])
+    }
+
     @Test("snapshotExecutionKindIsUploadForUploadRequest")
     func snapshotExecutionKindIsUploadForUploadRequest() async throws {
         let capture = Support.ExecutionKindCapture()

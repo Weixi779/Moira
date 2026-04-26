@@ -77,7 +77,6 @@ struct APIProviderRetryTests {
         #expect(client.requestCount == 2)
         #expect(counts.prepare == 2)
         #expect(counts.adapt == 2)
-        #expect(counts.process == 1)
         #expect(await log.all() == ["willSend", "shouldRetry", "willRetry", "willSend", "didReceive"])
     }
 
@@ -93,7 +92,7 @@ struct APIProviderRetryTests {
             plugins: [Support.ObserverProbe(log: log)]
         )
 
-        await #expect(throws: APIError.self) {
+        await #expect(throws: Support.TestError.self) {
             try await provider.request(Support.SimpleRequest())
         }
 
@@ -117,7 +116,7 @@ struct APIProviderRetryTests {
             )
         )
 
-        await #expect(throws: APIError.self) {
+        await #expect(throws: Support.TestError.self) {
             try await provider.request(Support.SimpleRequest())
         }
 
@@ -144,11 +143,35 @@ struct APIProviderRetryTests {
             )
         )
 
-        await #expect(throws: APIError.self) {
+        await #expect(throws: Support.TestError.self) {
             try await provider.request(Support.SimpleRequest())
         }
 
         #expect(client.requestCount == 0)
         #expect(await log.all().isEmpty)
+    }
+
+    @Test("cancellationDoesNotEnterRetryOrFailureHandling")
+    func cancellationDoesNotEnterRetryOrFailureHandling() async {
+        let log = Support.EventLog()
+        let client = Support.MockClient { _ in
+            throw CancellationError()
+        }
+        let provider = APIProvider(
+            client: client,
+            builder: Support.makeBuilder(),
+            plugins: [Support.ObserverProbe(log: log)],
+            retryStrategy: Support.RetryProbe(
+                log: log,
+                decision: .retry(.reuseRequest)
+            )
+        )
+
+        await #expect(throws: CancellationError.self) {
+            try await provider.request(Support.SimpleRequest())
+        }
+
+        #expect(client.requestCount == 1)
+        #expect(await log.all() == ["willSend"])
     }
 }
