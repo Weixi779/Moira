@@ -1,8 +1,8 @@
 import Alamofire
 import Foundation
 
-/// Alamofire-backed implementation of `APIClient`.
-public final class AlamofireClient: APIClient {
+/// Alamofire-backed implementation of `APIClient` and `APIUploadClient`.
+public final class AlamofireClient: APIClient, APIUploadClient, @unchecked Sendable {
     private let session: Session
 
     /// Creates a client using the provided Alamofire session.

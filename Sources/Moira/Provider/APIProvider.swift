@@ -2,7 +2,8 @@ import Foundation
 
 /// Default provider implementation that runs the request pipeline.
 public final class APIProvider: APIProviding, @unchecked Sendable {
-    private let client: APIClient
+    private let client: any APIClient
+    private let uploadClient: (any APIUploadClient)?
     private let builder: any URLRequestBuilding
     private let runner: PluginRunner
     private let decoder: ResponseDecoder
@@ -10,13 +11,14 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
 
     /// Creates a provider with a client, builder, and optional plugins.
     public init(
-        client: APIClient,
+        client: any APIClient,
         builder: any URLRequestBuilding,
         decoder: ResponseDecoder = JSONDecoder(),
         plugins: [any RequestPlugin] = [],
         retryStrategy: any RetryStrategy = NoRetryStrategy()
     ) {
         self.client = client
+        self.uploadClient = client as? any APIUploadClient
         self.builder = builder
         self.runner = PluginRunner(plugins: plugins)
         self.decoder = decoder
@@ -240,7 +242,7 @@ private extension APIProvider {
         request: URLRequest,
         context: RequestContext
     ) async throws -> UploadTask<APIResponse> {
-        let task = try client.upload(request, source: source)
+        let task = try requireUploadClient().upload(request, source: source)
         let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
             guard let self else {
                 throw CancellationError()
@@ -260,6 +262,13 @@ private extension APIProvider {
             }
         }
         return UploadTask(progress: task.progress, response: responseClosure)
+    }
+
+    func requireUploadClient() throws -> any APIUploadClient {
+        guard let uploadClient else {
+            throw APIError.capabilityNotSupported("Current client does not support uploads.")
+        }
+        return uploadClient
     }
 
     func buildRequest(for target: any APIRequest) async throws -> (any APIRequest, URLRequest) {

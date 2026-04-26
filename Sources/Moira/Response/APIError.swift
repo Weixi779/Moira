@@ -10,6 +10,8 @@ public enum APIError: Error, Sendable {
     case underlying(Error, response: APIResponse?)
     /// Request violates a model constraint (e.g. upload with non-empty body).
     case invalidRequest(String)
+    /// Requested capability is not supported by the configured client/provider.
+    case capabilityNotSupported(String)
 }
 
 extension APIError: LocalizedError {
@@ -25,6 +27,9 @@ extension APIError: LocalizedError {
         case let .invalidRequest(reason):
             if reason.isEmpty { return "Invalid request." }
             return "Invalid request: \(reason)"
+        case let .capabilityNotSupported(reason):
+            if reason.isEmpty { return "Capability not supported." }
+            return "Capability not supported: \(reason)"
         }
     }
 }
