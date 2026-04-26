@@ -8,19 +8,19 @@ Moira follows a fixed pipeline for every request, so plugin behavior stays predi
 
 ```
 prepare -> build -> adapt -> willSend
-  -> execute -> process -> didReceive
+  -> execute -> validate -> didReceive
   -> on error: shouldRetry? -> willRetry -> retry or didFail
 ```
 
 ## Retry
 
-- Retry decision is evaluated after transport or raw response processing failure.
+- Retry decision is evaluated after transport or raw response validation failure.
 - Each retry decision chooses whether to rebuild or reuse the request before sending again.
 - Request preparation, building, adaptation, and typed decoding failures are not retried.
 - `willSend` runs for each retry attempt after the request is rebuilt or reused.
 - `willRetry` is fired before the next attempt.
 - Final failure triggers `didFail` once.
-- Uploads and downloads are not retried by default.
+- Uploads and downloads are not retried by default. Upload responses are validated, but upload validation failures do not trigger retry.
 
 ## Observability
 

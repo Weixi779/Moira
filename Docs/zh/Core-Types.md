@@ -140,7 +140,7 @@ extension JSONDecoder: ResponseDecoder {}
 
 ## APIError
 
-请求流程对外暴露的错误。
+Moira 定义的错误。
 
 ```swift
 public enum APIError: Error, Sendable {
@@ -150,6 +150,8 @@ public enum APIError: Error, Sendable {
     case invalidRequest(String)
 }
 ```
+
+调用方不应假设 `APIProvider` 只会抛出 `APIError`。插件、response validation、自定义 client 抛出的错误可能会原样透出。Moira 会在框架自身产生的失败中显式抛出 `APIError`，例如非法请求模型、请求构建失败、typed decode 失败。`AlamofireClient` 也会将 Alamofire 失败包装为 `APIError.underlying`，以便在可用时携带 `APIResponse`。
 
 `invalidRequest` 在请求违反模型约束时抛出，例如上传请求同时携带非空 `payload.body`。
 

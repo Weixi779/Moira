@@ -140,7 +140,7 @@ extension JSONDecoder: ResponseDecoder {}
 
 ## APIError
 
-Errors surfaced by the request pipeline.
+Errors defined by Moira.
 
 ```swift
 public enum APIError: Error, Sendable {
@@ -150,6 +150,8 @@ public enum APIError: Error, Sendable {
     case invalidRequest(String)
 }
 ```
+
+Callers should not assume every `APIProvider` failure is an `APIError`. Plugin, response validation, and custom client errors may be propagated unchanged. Moira throws `APIError` for framework-defined failures such as invalid request models, request building failures, and typed decoding failures. `AlamofireClient` also wraps Alamofire failures as `APIError.underlying` so an `APIResponse` can be attached when available.
 
 `invalidRequest` is thrown when a request violates model constraints, such as an upload request with a non-empty `payload.body`.
 

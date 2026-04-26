@@ -20,3 +20,4 @@ Behavior notes:
 - Headers are normalized into `[String: String]` for inspection.
 - Upload exposes progress via `AsyncStream<UploadProgress>`.
 - Errors from Alamofire are wrapped as `APIError.underlying`, with the `APIResponse` attached when available.
+- Custom `APIClient` implementations may throw their own errors; `APIProvider` does not wrap unknown client errors.

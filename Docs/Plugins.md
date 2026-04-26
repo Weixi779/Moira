@@ -1,23 +1,36 @@
 # Plugins
 
-Moira splits plugins into two roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform and observer plugins. Retry is configured separately as a provider strategy.
+Moira splits plugins into three roles so behavior stays composable. `RequestPlugin` is the marker protocol used by the provider to collect and run transform, response validation, and observer plugins. Retry is configured separately as a provider strategy.
 
 ## TransformPlugin
 
-Use for mutating requests or responses.
+Use for mutating requests before transport.
 
 ```swift
 public protocol TransformPlugin: RequestPlugin {
     func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest
     func adaptRequest(_ request: URLRequest) async throws -> URLRequest
-    func processResponse(_ response: APIResponse) async throws -> APIResponse
 }
 ```
 
 Typical use:
 - Inject auth headers
 - Normalize paths or parameters
-- Transform response payloads
+
+## ResponseValidationPlugin
+
+Use for global raw response validation. Validation plugins inspect `APIResponse`, throw when the response is not acceptable, and never modify the response or perform typed decoding.
+
+```swift
+public protocol ResponseValidationPlugin: RequestPlugin {
+    func validateResponse(_ response: APIResponse) async throws
+}
+```
+
+Typical use:
+- Enforce accepted status code ranges
+- Reject responses with missing required headers
+- Gate raw responses before typed decoding
 
 ## ObserverPlugin
 
@@ -33,7 +46,7 @@ public protocol ObserverPlugin: RequestPlugin {
 
 ## RetryStrategy
 
-Use for retry decisions after transport or raw response processing failures.
+Use for retry decisions after transport or raw response validation failures.
 
 ```swift
 public enum RetryDecision: Sendable {
@@ -53,11 +66,12 @@ public protocol RetryStrategy: Sendable {
 }
 ```
 
-Retry strategies are passed via `APIProvider(retryStrategy:)`. If omitted, `NoRetryStrategy` disables retry. Request preparation, building, adaptation, and typed decoding failures are not retried. Each retry decision chooses whether the next attempt reuses the current `URLRequest` or rebuilds it.
+Retry strategies are passed via `APIProvider(retryStrategy:)`. If omitted, `NoRetryStrategy` disables retry. Request preparation, building, adaptation, upload response validation, and typed decoding failures are not retried. Each retry decision chooses whether the next attempt reuses the current `URLRequest` or rebuilds it.
 
 ## Execution behavior
 
 - Transform: runs in order, sequential.
+- Response validation: runs in order, sequential, and stops at the first thrown error.
 - Observer: runs concurrently.
 - Retry: provider strategy decides when to retry and whether to rebuild requests.
 

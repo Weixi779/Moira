@@ -18,4 +18,5 @@ public protocol APIClient {
 行为说明：
 - response headers 会被归一化为 `[String: String]` 便于查看。
 - 上传通过 `AsyncStream<UploadProgress>` 暴露进度。
-- 具体错误会被包装为 `APIError.underlying`，并在可用时附带 `APIResponse`。
+- Alamofire 错误会被包装为 `APIError.underlying`，并在可用时附带 `APIResponse`。
+- 自定义 `APIClient` 可以抛出自己的错误；`APIProvider` 不会包装未知 client 错误。
