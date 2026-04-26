@@ -51,12 +51,23 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
 
     /// Returns an upload task with progress for the raw response.
     public func uploadTask(_ target: any APIRequest) async throws -> UploadTask<APIResponse> {
-        let pipeline = try await preparePipeline(for: target)
+        let context = RequestContext(target: target)
+        try await prepare(context: context)
 
-        guard case let .upload(source) = pipeline.prepared.execution else {
+        let prepared = try await context.currentPreparedTarget()
+        guard case let .upload(source) = prepared.execution else {
             throw APIError.invalidRequest("uploadTask requires execution == .upload.")
         }
-        return try await executeUpload(source: source, request: pipeline.request, context: pipeline.context)
+
+        let uploadClient = try requireUploadClient()
+        let request = try await context.currentURLRequest()
+        await beginSendingAttempt(context: context)
+        return try await executeUpload(
+            source: source,
+            request: request,
+            context: context,
+            uploadClient: uploadClient
+        )
     }
 
     /// Returns an upload task with progress that decodes the response body.
@@ -78,44 +89,38 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
 }
 
 private extension APIProvider {
-    struct Pipeline {
-        let target: any APIRequest
-        let prepared: any APIRequest
-        let request: URLRequest
-        let context: RequestContext
-    }
+    // MARK: - Regular Requests
 
     /// Executes a regular request through the retry strategy.
     func executeRequest(_ target: any APIRequest) async throws -> APIResponse {
-        var pipeline = try await preparePipeline(for: target)
+        let context = RequestContext(target: target)
+        try await prepare(context: context)
+        try await ensureRegularRequest(context: context)
 
         while !Task.isCancelled {
             do {
-                return try await sendRequest(pipeline.request, context: pipeline.context)
+                await beginSendingAttempt(context: context)
+                return try await sendRequest(context: context)
             } catch {
                 if error is CancellationError {
                     throw error
                 }
 
-                await recordFailure(error, context: pipeline.context)
-                let snapshot = await pipeline.context.snapshot()
+                await recordFailure(error, context: context)
+                let snapshot = await context.snapshot()
                 let decision = await retryStrategy.shouldRetry(snapshot: snapshot, error: error)
 
                 switch decision {
                 case .doNotRetry:
-                    await notifyDidFail(context: pipeline.context)
+                    await notifyDidFail(context: context)
                     throw error
                 case let .retry(behavior):
                     try await prepareNextRetry(
                         decision: decision,
                         snapshot: snapshot,
                         error: error,
-                        context: pipeline.context
-                    )
-                    pipeline = try await nextPipeline(
                         behavior: behavior,
-                        target: target,
-                        current: pipeline
+                        context: context
                     )
                 case let .retryAfter(delay, behavior):
                     try await prepareNextRetry(
@@ -123,12 +128,8 @@ private extension APIProvider {
                         delay: delay,
                         snapshot: snapshot,
                         error: error,
-                        context: pipeline.context
-                    )
-                    pipeline = try await nextPipeline(
                         behavior: behavior,
-                        target: target,
-                        current: pipeline
+                        context: context
                     )
                 }
             }
@@ -136,63 +137,127 @@ private extension APIProvider {
         throw CancellationError()
     }
 
-    /// Builds and adapts the request, then notifies observers.
-    func preparePipeline(
-        for target: any APIRequest,
-        context existingContext: RequestContext? = nil,
-        resetForRetry: Bool = false
-    ) async throws -> Pipeline {
-        let (prepared, adapted) = try await buildRequest(for: target)
-
-        let context = existingContext ?? RequestContext(target: target)
-        if resetForRetry {
-            await context.resetForRetry(request: adapted)
-        } else {
-            await context.updateRequest(adapted)
-        }
-
-        await notifyWillSend(context: context)
-
-        return Pipeline(
-            target: target,
-            prepared: prepared,
-            request: adapted,
-            context: context
-        )
-    }
-
-    /// Prepares the URLRequest for the next retry attempt.
-    func nextPipeline(
-        behavior: RetryRequestBehavior,
-        target: any APIRequest,
-        current: Pipeline
-    ) async throws -> Pipeline {
-        switch behavior {
-        case .reuseRequest:
-            await current.context.resetForRetry(request: current.request)
-            await notifyWillSend(context: current.context)
-            return current
-        case .rebuildRequest:
-            return try await preparePipeline(
-                for: target,
-                context: current.context,
-                resetForRetry: true
-            )
-        }
-    }
-
     /// Performs the actual transport and successful response validation for a built request.
-    func sendRequest(_ request: URLRequest, context: RequestContext) async throws -> APIResponse {
+    func sendRequest(context: RequestContext) async throws -> APIResponse {
+        let request = try await context.currentURLRequest()
         let response = try await client.request(request)
         try await validateResponse(response, context: context)
         await notifyDidReceive(context: context)
         return response
     }
 
+    func ensureRegularRequest(context: RequestContext) async throws {
+        let prepared = try await context.currentPreparedTarget()
+        guard case .request = prepared.execution else {
+            throw APIError.invalidRequest("request requires execution == .request.")
+        }
+    }
+
+    // MARK: - Retry
+
+    /// Runs retry side effects before the next regular request attempt starts.
+    func prepareNextRetry(
+        decision: RetryDecision,
+        delay: TimeInterval? = nil,
+        snapshot: RequestSnapshot,
+        error: Error,
+        behavior: RetryRequestBehavior,
+        context: RequestContext
+    ) async throws {
+        await retryStrategy.willRetry(snapshot: snapshot, error: error, decision: decision)
+        await context.beginRetryPreparation(rebuildsRequest: behavior == .rebuildRequest)
+        if let delay {
+            try await Task.sleep(for: .seconds(delay))
+        }
+
+        guard behavior == .rebuildRequest else { return }
+
+        do {
+            try await prepare(context: context)
+            try await ensureRegularRequest(context: context)
+        } catch {
+            await recordFailure(error, context: context)
+            await notifyDidFail(context: context)
+            throw error
+        }
+    }
+
+    // MARK: - Uploads
+
+    /// Executes an upload without retry, returning an UploadTask.
+    func executeUpload(
+        source: UploadSource,
+        request: URLRequest,
+        context: RequestContext,
+        uploadClient: any APIUploadClient
+    ) async throws -> UploadTask<APIResponse> {
+        let task: UploadTask<APIResponse>
+        do {
+            task = try uploadClient.upload(request, source: source)
+        } catch {
+            await recordFailure(error, context: context)
+            await notifyDidFail(context: context)
+            throw error
+        }
+
+        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
+            guard let self else {
+                throw CancellationError()
+            }
+            do {
+                let response = try await task.response()
+                try await self.validateResponse(response, context: context)
+                await self.notifyDidReceive(context: context)
+                return response
+            } catch {
+                await self.recordFailure(error, context: context)
+                await self.notifyDidFail(context: context)
+                throw error
+            }
+        }
+        return UploadTask(progress: task.progress, response: responseClosure)
+    }
+
+    func requireUploadClient() throws -> any APIUploadClient {
+        guard let uploadClient else {
+            throw APIError.capabilityNotSupported("Current client does not support uploads.")
+        }
+        return uploadClient
+    }
+
+    // MARK: - Preparation and Validation
+
+    /// Builds and adapts the request without notifying observers.
+    func prepare(context: RequestContext) async throws {
+        let target = await context.originalTarget()
+        let (prepared, adapted) = try await buildRequest(for: target)
+        await context.setPreparedTargetAndRequest(prepared, request: adapted)
+    }
+
+    func buildRequest(for target: any APIRequest) async throws -> (any APIRequest, URLRequest) {
+        let prepared = try await runner.prepareRequest(target)
+        let built = try builder.build(prepared)
+        let adapted = try await runner.adaptRequest(built)
+        return (prepared, adapted)
+    }
+
     /// Stores and validates the raw response.
     func validateResponse(_ response: APIResponse, context: RequestContext) async throws {
-        await context.updateResponse(response)
+        await context.recordResponse(response)
         try await runner.validateResponse(response)
+    }
+
+    /// Stores failure details for observer and retry snapshots.
+    func recordFailure(_ error: Error, context: RequestContext) async {
+        await context.recordFailure(error)
+    }
+
+    // MARK: - Observer Notifications
+
+    /// Starts a transport attempt and notifies observers.
+    func beginSendingAttempt(context: RequestContext) async {
+        await context.beginSendingAttempt()
+        await notifyWillSend(context: context)
     }
 
     /// Notifies observers before sending a request.
@@ -211,77 +276,5 @@ private extension APIProvider {
     func notifyDidFail(context: RequestContext) async {
         let snapshot = await context.snapshot()
         await runner.didFail(snapshot: snapshot)
-    }
-
-    /// Stores failure details for observer and retry snapshots.
-    func recordFailure(_ error: Error, context: RequestContext) async {
-        await context.updateError(error)
-        if let response = Self.response(from: error) {
-            await context.updateResponse(response)
-        }
-    }
-
-    /// Runs retry side effects before the next attempt starts.
-    func prepareNextRetry(
-        decision: RetryDecision,
-        delay: TimeInterval? = nil,
-        snapshot: RequestContext.Snapshot,
-        error: Error,
-        context: RequestContext
-    ) async throws {
-        await retryStrategy.willRetry(snapshot: snapshot, error: error, decision: decision)
-        await context.incrementRetryCount()
-        if let delay {
-            try await Task.sleep(for: .seconds(delay))
-        }
-    }
-
-    /// Executes an upload without retry, returning an UploadTask.
-    func executeUpload(
-        source: UploadSource,
-        request: URLRequest,
-        context: RequestContext
-    ) async throws -> UploadTask<APIResponse> {
-        let task = try requireUploadClient().upload(request, source: source)
-        let responseClosure = { @Sendable [weak self] () async throws -> APIResponse in
-            guard let self else {
-                throw CancellationError()
-            }
-            do {
-                let response = try await task.response()
-                try await self.validateResponse(response, context: context)
-                await self.notifyDidReceive(context: context)
-                return response
-            } catch {
-                await context.updateError(error)
-                if let response = Self.response(from: error) {
-                    await context.updateResponse(response)
-                }
-                await self.notifyDidFail(context: context)
-                throw error
-            }
-        }
-        return UploadTask(progress: task.progress, response: responseClosure)
-    }
-
-    func requireUploadClient() throws -> any APIUploadClient {
-        guard let uploadClient else {
-            throw APIError.capabilityNotSupported("Current client does not support uploads.")
-        }
-        return uploadClient
-    }
-
-    func buildRequest(for target: any APIRequest) async throws -> (any APIRequest, URLRequest) {
-        let prepared = try await runner.prepareRequest(target)
-        let built = try builder.build(prepared)
-        let adapted = try await runner.adaptRequest(built)
-        return (prepared, adapted)
-    }
-
-    static func response(from error: Error) -> APIResponse? {
-        guard case let APIError.underlying(_, response) = error else {
-            return nil
-        }
-        return response
     }
 }

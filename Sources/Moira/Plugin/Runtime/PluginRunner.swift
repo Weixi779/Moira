@@ -46,7 +46,7 @@ extension PluginRunner: ResponseValidationPlugin {
 
 extension PluginRunner: ObserverPlugin {
     /// Broadcasts `willSend` concurrently to observers.
-    public func willSend(snapshot: RequestContext.Snapshot) async {
+    public func willSend(snapshot: RequestSnapshot) async {
         await withTaskGroup(of: Void.self) { group in
             for plugin in observerPlugins {
                 group.addTask {
@@ -56,7 +56,7 @@ extension PluginRunner: ObserverPlugin {
         }
     }
 
-    public func didReceive(snapshot: RequestContext.Snapshot) async {
+    public func didReceive(snapshot: RequestSnapshot) async {
         await withTaskGroup(of: Void.self) { group in
             for plugin in observerPlugins {
                 group.addTask {
@@ -66,7 +66,7 @@ extension PluginRunner: ObserverPlugin {
         }
     }
 
-    public func didFail(snapshot: RequestContext.Snapshot) async {
+    public func didFail(snapshot: RequestSnapshot) async {
         await withTaskGroup(of: Void.self) { group in
             for plugin in observerPlugins {
                 group.addTask {
