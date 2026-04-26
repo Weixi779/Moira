@@ -38,6 +38,34 @@ public enum RequestExecution: Sendable {
 
 Determines whether the request executes as a regular HTTP request or an upload. The provider dispatches based on this value.
 
+## RequestExecutionKind
+
+```swift
+public enum RequestExecutionKind: Sendable, Equatable {
+    case request
+    case upload
+}
+```
+
+Read-only execution kind exposed by `RequestSnapshot`. It is resolved from the prepared target after transform plugins run.
+
+## RequestSnapshot
+
+```swift
+public struct RequestSnapshot: @unchecked Sendable {
+    public let id: UUID
+    public let target: any APIRequest
+    public let executionKind: RequestExecutionKind
+    public let attemptStartedAt: Date
+    public let request: URLRequest?
+    public let response: APIResponse?
+    public let error: Error?
+    public let retryCount: Int
+}
+```
+
+Lifecycle state passed to observers and retry strategies. `target` is always the original target before transform plugins. `executionKind` reflects the prepared target that is actually dispatched. `attemptStartedAt` is set when the attempt is about to be handed to transport, not during prepare/build/adapt or retry backoff.
+
 ## RequestMethod
 
 ```swift

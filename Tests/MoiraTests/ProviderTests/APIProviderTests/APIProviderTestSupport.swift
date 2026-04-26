@@ -8,6 +8,16 @@ enum APIProviderTestSupport {
         URLRequestBuilder(baseURL: baseURL)
     }
 
+    final class CountingBuilder: URLRequestBuilding, @unchecked Sendable {
+        private let builder = URLRequestBuilder(baseURL: APIProviderTestSupport.baseURL)
+        private(set) var buildCount = 0
+
+        func build(_ target: any APIRequest) throws -> URLRequest {
+            buildCount += 1
+            return try builder.build(target)
+        }
+    }
+
     static func makeResponse(statusCode: Int = 200, data: Data = Data()) -> APIResponse {
         APIResponse(statusCode: statusCode, data: data, headers: [:])
     }
@@ -43,6 +53,7 @@ enum APIProviderTestSupport {
     final class MockClient: APIClient, APIUploadClient, @unchecked Sendable {
         private(set) var requestCount = 0
         private(set) var uploadCount = 0
+        private(set) var uploadedSource: UploadSource?
         private let handler: @Sendable (URLRequest) async throws -> APIResponse
 
         init(handler: @escaping @Sendable (URLRequest) async throws -> APIResponse) {
@@ -56,6 +67,7 @@ enum APIProviderTestSupport {
 
         func upload(_ request: URLRequest, source: UploadSource) throws -> UploadTask<APIResponse> {
             uploadCount += 1
+            uploadedSource = source
             let handler = self.handler
             let (stream, continuation) = AsyncStream<UploadProgress>.makeStream()
             continuation.finish()
@@ -88,16 +100,53 @@ enum APIProviderTestSupport {
     struct ObserverProbe: ObserverPlugin {
         let log: EventLog
 
-        func willSend(snapshot: RequestContext.Snapshot) async {
+        func willSend(snapshot: RequestSnapshot) async {
             await log.add("willSend")
         }
 
-        func didReceive(snapshot: RequestContext.Snapshot) async {
+        func didReceive(snapshot: RequestSnapshot) async {
             await log.add("didReceive")
         }
 
-        func didFail(snapshot: RequestContext.Snapshot) async {
+        func didFail(snapshot: RequestSnapshot) async {
             await log.add("didFail")
+        }
+    }
+
+    struct SnapshotObserverProbe: ObserverPlugin {
+        let log: EventLog?
+        let capture: SnapshotCapture
+
+        init(log: EventLog? = nil, capture: SnapshotCapture) {
+            self.log = log
+            self.capture = capture
+        }
+
+        func willSend(snapshot: RequestSnapshot) async {
+            await log?.add("willSend")
+            await capture.add("willSend", snapshot: snapshot)
+        }
+
+        func didReceive(snapshot: RequestSnapshot) async {
+            await log?.add("didReceive")
+            await capture.add("didReceive", snapshot: snapshot)
+        }
+
+        func didFail(snapshot: RequestSnapshot) async {
+            await log?.add("didFail")
+            await capture.add("didFail", snapshot: snapshot)
+        }
+    }
+
+    actor SnapshotCapture {
+        private var snapshots: [String: [RequestSnapshot]] = [:]
+
+        func add(_ event: String, snapshot: RequestSnapshot) {
+            snapshots[event, default: []].append(snapshot)
+        }
+
+        func all(_ event: String) -> [RequestSnapshot] {
+            snapshots[event] ?? []
         }
     }
 
@@ -116,11 +165,11 @@ enum APIProviderTestSupport {
     struct ResponseCaptureProbe: ObserverPlugin {
         let capture: ResponseCapture
 
-        func willSend(snapshot: RequestContext.Snapshot) async {}
+        func willSend(snapshot: RequestSnapshot) async {}
 
-        func didReceive(snapshot: RequestContext.Snapshot) async {}
+        func didReceive(snapshot: RequestSnapshot) async {}
 
-        func didFail(snapshot: RequestContext.Snapshot) async {
+        func didFail(snapshot: RequestSnapshot) async {
             await capture.set(snapshot.response)
         }
     }
@@ -129,13 +178,30 @@ enum APIProviderTestSupport {
         let log: EventLog
         let decision: RetryDecision
 
-        func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
+        func shouldRetry(snapshot: RequestSnapshot, error: Error) async -> RetryDecision {
             await log.add("shouldRetry")
             return decision
         }
 
-        func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async {
+        func willRetry(snapshot: RequestSnapshot, error: Error, decision: RetryDecision) async {
             await log.add("willRetry")
+        }
+    }
+
+    struct SnapshotRetryProbe: RetryStrategy {
+        let log: EventLog
+        let capture: SnapshotCapture
+        let decision: RetryDecision
+
+        func shouldRetry(snapshot: RequestSnapshot, error: Error) async -> RetryDecision {
+            await log.add("shouldRetry")
+            await capture.add("shouldRetry", snapshot: snapshot)
+            return decision
+        }
+
+        func willRetry(snapshot: RequestSnapshot, error: Error, decision: RetryDecision) async {
+            await log.add("willRetry")
+            await capture.add("willRetry", snapshot: snapshot)
         }
     }
 
@@ -168,6 +234,59 @@ enum APIProviderTestSupport {
         }
     }
 
+    actor ThrowingSecondAdaptProbe: TransformPlugin {
+        let error: TestError
+        private var adaptCount = 0
+
+        init(error: TestError = .sample) {
+            self.error = error
+        }
+
+        func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
+            request
+        }
+
+        func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
+            defer { adaptCount += 1 }
+            if adaptCount == 1 {
+                throw error
+            }
+            return request
+        }
+    }
+
+    struct ExecutionTransformPlugin: TransformPlugin {
+        let execution: RequestExecution
+
+        func prepareRequest(_ request: any APIRequest) async throws -> any APIRequest {
+            PreparedRequest(base: request, execution: execution)
+        }
+
+        func adaptRequest(_ request: URLRequest) async throws -> URLRequest {
+            request
+        }
+    }
+
+    struct PreparedRequest: APIRequest {
+        let path: String
+        let method: RequestMethod
+        let payload: RequestPayload
+        let execution: RequestExecution
+        let baseURL: URL?
+        let headers: [String: String]?
+        let timeout: TimeInterval
+
+        init(base: any APIRequest, execution: RequestExecution) {
+            self.path = base.path
+            self.method = base.method
+            self.payload = base.payload
+            self.execution = execution
+            self.baseURL = base.baseURL
+            self.headers = base.headers
+            self.timeout = base.timeout
+        }
+    }
+
     actor AttemptCounter {
         private var value = 0
 
@@ -177,7 +296,7 @@ enum APIProviderTestSupport {
         }
     }
 
-    enum TestError: Error {
+    enum TestError: Error, Equatable {
         case sample
         case decodingFailed
         case unimplemented
@@ -230,13 +349,13 @@ enum APIProviderTestSupport {
     }
 
     actor ExecutionKindCapture {
-        private var kind: RequestContext.ExecutionKind?
+        private var kind: RequestExecutionKind?
 
-        func set(_ kind: RequestContext.ExecutionKind) {
+        func set(_ kind: RequestExecutionKind) {
             self.kind = kind
         }
 
-        func get() -> RequestContext.ExecutionKind? {
+        func get() -> RequestExecutionKind? {
             kind
         }
     }
@@ -244,12 +363,12 @@ enum APIProviderTestSupport {
     struct ExecutionKindProbe: ObserverPlugin {
         let capture: ExecutionKindCapture
 
-        func willSend(snapshot: RequestContext.Snapshot) async {
+        func willSend(snapshot: RequestSnapshot) async {
             await capture.set(snapshot.executionKind)
         }
 
-        func didReceive(snapshot: RequestContext.Snapshot) async {}
-        func didFail(snapshot: RequestContext.Snapshot) async {}
+        func didReceive(snapshot: RequestSnapshot) async {}
+        func didFail(snapshot: RequestSnapshot) async {}
     }
 
     struct EmptyResponse: Decodable {}

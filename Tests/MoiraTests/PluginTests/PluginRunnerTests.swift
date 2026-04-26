@@ -63,20 +63,20 @@ private struct ObserverProbe: ObserverPlugin {
     let name: String
     let log: EventLog
 
-    func willSend(snapshot: RequestContext.Snapshot) async {
+    func willSend(snapshot: RequestSnapshot) async {
         await log.add("willSend:\(name)")
     }
 
-    func didReceive(snapshot: RequestContext.Snapshot) async {
+    func didReceive(snapshot: RequestSnapshot) async {
         await log.add("didReceive:\(name)")
     }
 
-    func didFail(snapshot: RequestContext.Snapshot) async {
+    func didFail(snapshot: RequestSnapshot) async {
         await log.add("didFail:\(name)")
     }
 }
 
-private func makeSnapshot() async -> RequestContext.Snapshot {
+private func makeSnapshot() async -> RequestSnapshot {
     let context = RequestContext(target: TestRequest())
     return await context.snapshot()
 }

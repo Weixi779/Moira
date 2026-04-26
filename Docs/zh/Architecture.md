@@ -17,12 +17,12 @@ prepare -> build -> adapt -> willSend
 - transport 或 raw response validation 失败后，会询问 RetryStrategy 是否重试。
 - 每次重试决策会决定重建或复用请求，然后再次发送。
 - 请求准备、构建、适配以及 typed decode 失败不会触发重试。
-- 每次重试在请求重建或复用后都会重新触发 `willSend`。
+- `willSend` 只在 prepared request 即将交给 transport 时触发；非法请求模型或不支持的能力不会触发 `willSend`。
 - `willRetry` 在下一次尝试前触发。
 - 最终失败只触发一次 `didFail`。
-- 上传与下载默认不参与重试。上传响应会执行 validation，但上传 validation 失败不会触发重试。
+- 上传与下载默认不参与重试。上传响应会执行 validation，但上传 validation 失败不会触发重试。上传响应生命周期事件会在调用方 await `UploadTask.response()` 时发生。
 
 ## 可观测性
 
-- Observer 只能读取 `RequestContext.Snapshot`。
+- Observer 只能读取 `RequestSnapshot`。
 - Observer 以并发方式执行。

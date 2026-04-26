@@ -38,9 +38,9 @@ public protocol ResponseValidationPlugin: RequestPlugin {
 
 ```swift
 public protocol ObserverPlugin: RequestPlugin {
-    func willSend(snapshot: RequestContext.Snapshot) async
-    func didReceive(snapshot: RequestContext.Snapshot) async
-    func didFail(snapshot: RequestContext.Snapshot) async
+    func willSend(snapshot: RequestSnapshot) async
+    func didReceive(snapshot: RequestSnapshot) async
+    func didFail(snapshot: RequestSnapshot) async
 }
 ```
 
@@ -61,33 +61,39 @@ public enum RetryRequestBehavior: Sendable {
 }
 
 public protocol RetryStrategy: Sendable {
-    func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision
-    func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async
+    func shouldRetry(snapshot: RequestSnapshot, error: Error) async -> RetryDecision
+    func willRetry(snapshot: RequestSnapshot, error: Error, decision: RetryDecision) async
 }
 ```
 
-Retry 策略通过 `APIProvider(retryStrategy:)` 传入。未传入时使用 `NoRetryStrategy`，即不重试。请求准备、构建、适配、上传响应 validation 以及 typed decode 失败不会触发重试。每次重试决策都会决定下一次尝试复用当前 `URLRequest`，还是重新构建。
+Retry 策略通过 `APIProvider(retryStrategy:)` 传入。未传入时使用 `NoRetryStrategy`，即不重试。初始请求准备、构建、适配、上传响应 validation 以及 typed decode 失败不会触发重试。每次重试决策都会决定下一次尝试复用当前 `URLRequest`，还是重新构建。
 
 ## 执行规则
 
 - Transform：顺序执行。
 - Response validation：顺序执行，遇到第一个抛错后停止。
 - Observer：并发执行。
+- `willSend`：只在 prepared request 即将交给 transport 时触发。
 - Retry：Provider 策略决定是否重试以及是否重建请求。
 
-## RequestContext
+## RequestSnapshot
 
-`RequestContext` 保存请求级状态，并提供只读快照供插件读取。快照不可变，适合在并发的 Observer 中使用。
+`RequestSnapshot` 是 Observer 和 RetryStrategy 可读取的公开生命周期模型。`target` 始终是 transform 插件处理前的原始 target；`executionKind` 来自 prepared target，表示实际将被派发的执行路径。
 
 ```swift
-public actor RequestContext {
+public enum RequestExecutionKind: Sendable, Equatable {
+    case request
+    case upload
+}
+
+public struct RequestSnapshot: @unchecked Sendable {
     public let id: UUID
     public let target: any APIRequest
-    public private(set) var startTime: Date
-
-    public private(set) var request: URLRequest?
-    public private(set) var response: APIResponse?
-    public private(set) var error: Error?
-    public private(set) var retryCount: Int
+    public let executionKind: RequestExecutionKind
+    public let attemptStartedAt: Date
+    public let request: URLRequest?
+    public let response: APIResponse?
+    public let error: Error?
+    public let retryCount: Int
 }
 ```

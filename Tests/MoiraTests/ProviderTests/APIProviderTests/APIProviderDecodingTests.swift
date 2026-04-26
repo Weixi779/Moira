@@ -19,7 +19,7 @@ struct APIProviderDecodingTests {
     }
 
     @Test("requestDecodedMapsDecodingErrors")
-    func requestDecodedMapsDecodingErrors() async {
+    func requestDecodedMapsDecodingErrors() async throws {
         let client = Support.MockClient { _ in
             Support.makeResponse(data: Data("{}".utf8))
         }
@@ -29,11 +29,10 @@ struct APIProviderDecodingTests {
             decoder: Support.ThrowingDecoder()
         )
 
-        let error = await #expect(throws: APIError.self) {
+        let error = try #require(await #expect(throws: APIError.self) {
             let _: Support.EmptyResponse = try await provider.request(Support.SimpleRequest())
-        }
+        })
 
-        guard let error else { return }
         guard case .responseDecodingFailed = error else {
             Issue.record("Expected APIError.responseDecodingFailed from request decoding.")
             return
@@ -41,20 +40,19 @@ struct APIProviderDecodingTests {
     }
 
     @Test("decodeErrorsAreMappedToAPIError")
-    func decodeErrorsAreMappedToAPIError() async {
+    func decodeErrorsAreMappedToAPIError() async throws {
         let client = Support.MockClient { _ in
             Support.makeResponse(data: Data("{}".utf8))
         }
         let provider = APIProvider(client: client, builder: Support.makeBuilder())
 
-        let error = await #expect(throws: APIError.self) {
+        let error = try #require(await #expect(throws: APIError.self) {
             let _: Support.EmptyResponse = try await provider.request(
                 Support.SimpleRequest(),
                 decoder: Support.ThrowingDecoder()
             )
-        }
+        })
 
-        guard let error else { return }
         guard case .responseDecodingFailed = error else {
             Issue.record("Expected APIError.responseDecodingFailed from request decoding.")
             return

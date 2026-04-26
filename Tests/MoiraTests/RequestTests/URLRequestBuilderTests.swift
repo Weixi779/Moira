@@ -274,7 +274,7 @@ struct URLRequestBuilderTests {
     }
 
     @Test("buildThrowsInvalidRequestForUploadWithNonEmptyBody")
-    func buildThrowsInvalidRequestForUploadWithNonEmptyBody() {
+    func buildThrowsInvalidRequestForUploadWithNonEmptyBody() throws {
         let builder = URLRequestBuilder(baseURL: requestBuilderBaseURL)
         let request = SimpleRequest(
             method: .post,
@@ -282,11 +282,10 @@ struct URLRequestBuilderTests {
             execution: .upload(.data(Data([0x02])))
         )
 
-        let error = #expect(throws: APIError.self) {
+        let error = try #require(#expect(throws: APIError.self) {
             try builder.build(request)
-        }
+        })
 
-        guard let error else { return }
         guard case .invalidRequest = error else {
             Issue.record("Expected APIError.invalidRequest for upload with non-empty body.")
             return

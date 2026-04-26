@@ -38,9 +38,9 @@ Use for logging or metrics. Observers never mutate.
 
 ```swift
 public protocol ObserverPlugin: RequestPlugin {
-    func willSend(snapshot: RequestContext.Snapshot) async
-    func didReceive(snapshot: RequestContext.Snapshot) async
-    func didFail(snapshot: RequestContext.Snapshot) async
+    func willSend(snapshot: RequestSnapshot) async
+    func didReceive(snapshot: RequestSnapshot) async
+    func didFail(snapshot: RequestSnapshot) async
 }
 ```
 
@@ -61,33 +61,39 @@ public enum RetryRequestBehavior: Sendable {
 }
 
 public protocol RetryStrategy: Sendable {
-    func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision
-    func willRetry(snapshot: RequestContext.Snapshot, error: Error, decision: RetryDecision) async
+    func shouldRetry(snapshot: RequestSnapshot, error: Error) async -> RetryDecision
+    func willRetry(snapshot: RequestSnapshot, error: Error, decision: RetryDecision) async
 }
 ```
 
-Retry strategies are passed via `APIProvider(retryStrategy:)`. If omitted, `NoRetryStrategy` disables retry. Request preparation, building, adaptation, upload response validation, and typed decoding failures are not retried. Each retry decision chooses whether the next attempt reuses the current `URLRequest` or rebuilds it.
+Retry strategies are passed via `APIProvider(retryStrategy:)`. If omitted, `NoRetryStrategy` disables retry. Initial request preparation, building, adaptation, upload response validation, and typed decoding failures are not retried. Each retry decision chooses whether the next attempt reuses the current `URLRequest` or rebuilds it.
 
 ## Execution behavior
 
 - Transform: runs in order, sequential.
 - Response validation: runs in order, sequential, and stops at the first thrown error.
 - Observer: runs concurrently.
+- `willSend`: runs only when a prepared request is about to be handed to transport.
 - Retry: provider strategy decides when to retry and whether to rebuild requests.
 
-## RequestContext
+## RequestSnapshot
 
-`RequestContext` carries request-scoped state and exposes a read-only snapshot for plugins. Snapshots are immutable and safe to use across concurrent observers.
+`RequestSnapshot` is the public read-only lifecycle model for observers and retry strategies. Its `target` is always the original target before transform plugins. `executionKind` is resolved from the prepared target that will actually be dispatched.
 
 ```swift
-public actor RequestContext {
+public enum RequestExecutionKind: Sendable, Equatable {
+    case request
+    case upload
+}
+
+public struct RequestSnapshot: @unchecked Sendable {
     public let id: UUID
     public let target: any APIRequest
-    public private(set) var startTime: Date
-
-    public private(set) var request: URLRequest?
-    public private(set) var response: APIResponse?
-    public private(set) var error: Error?
-    public private(set) var retryCount: Int
+    public let executionKind: RequestExecutionKind
+    public let attemptStartedAt: Date
+    public let request: URLRequest?
+    public let response: APIResponse?
+    public let error: Error?
+    public let retryCount: Int
 }
 ```

@@ -38,6 +38,34 @@ public enum RequestExecution: Sendable {
 
 决定请求是普通 HTTP 请求还是上传请求。Provider 根据此值进行派发。
 
+## RequestExecutionKind
+
+```swift
+public enum RequestExecutionKind: Sendable, Equatable {
+    case request
+    case upload
+}
+```
+
+`RequestSnapshot` 暴露的只读执行类型。它来自 transform 插件运行后的 prepared target。
+
+## RequestSnapshot
+
+```swift
+public struct RequestSnapshot: @unchecked Sendable {
+    public let id: UUID
+    public let target: any APIRequest
+    public let executionKind: RequestExecutionKind
+    public let attemptStartedAt: Date
+    public let request: URLRequest?
+    public let response: APIResponse?
+    public let error: Error?
+    public let retryCount: Int
+}
+```
+
+传给 Observer 和 RetryStrategy 的生命周期状态。`target` 始终是 transform 插件处理前的原始 target；`executionKind` 反映实际派发的 prepared target。`attemptStartedAt` 在 attempt 即将交给 transport 时设置，不包含 prepare/build/adapt 或 retry backoff 时间。
+
 ## RequestMethod
 
 ```swift

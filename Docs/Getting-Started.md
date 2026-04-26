@@ -59,7 +59,7 @@ let provider = APIProvider(client: URLSessionClient(), builder: builder)
 
 ```swift
 struct DefaultRetryStrategy: RetryStrategy {
-    func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision {
+    func shouldRetry(snapshot: RequestSnapshot, error: Error) async -> RetryDecision {
         snapshot.retryCount == 0 ? .retry(.rebuildRequest) : .doNotRetry
     }
 }

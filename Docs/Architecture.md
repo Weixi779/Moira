@@ -17,12 +17,12 @@ prepare -> build -> adapt -> willSend
 - Retry decision is evaluated after transport or raw response validation failure.
 - Each retry decision chooses whether to rebuild or reuse the request before sending again.
 - Request preparation, building, adaptation, and typed decoding failures are not retried.
-- `willSend` runs for each retry attempt after the request is rebuilt or reused.
+- `willSend` runs only when a prepared request is about to be handed to transport. Invalid request models and unsupported capabilities do not trigger `willSend`.
 - `willRetry` is fired before the next attempt.
 - Final failure triggers `didFail` once.
-- Uploads and downloads are not retried by default. Upload responses are validated, but upload validation failures do not trigger retry.
+- Uploads and downloads are not retried by default. Upload responses are validated, but upload validation failures do not trigger retry. Upload response lifecycle events happen when `UploadTask.response()` is awaited.
 
 ## Observability
 
-- Observers read `RequestContext.Snapshot` only.
+- Observers read `RequestSnapshot` only.
 - Observer plugins run concurrently.
