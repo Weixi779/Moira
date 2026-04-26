@@ -13,6 +13,10 @@ let package = Package(
             name: "Moira",
             targets: ["Moira"]
         ),
+        .library(
+            name: "MoiraAlamofire",
+            targets: ["MoiraAlamofire"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
@@ -20,7 +24,12 @@ let package = Package(
     targets: [
         .target(
             name: "Moira",
+            dependencies: []
+        ),
+        .target(
+            name: "MoiraAlamofire",
             dependencies: [
+                "Moira",
                 .product(name: "Alamofire", package: "Alamofire"),
             ]
         ),
@@ -28,6 +37,7 @@ let package = Package(
             name: "MoiraTests",
             dependencies: [
                 "Moira",
+                "MoiraAlamofire",
             ]
         ),
     ]

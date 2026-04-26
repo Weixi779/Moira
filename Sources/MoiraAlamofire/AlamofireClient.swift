@@ -1,5 +1,6 @@
 import Alamofire
 import Foundation
+import Moira
 
 /// Alamofire-backed implementation of `APIClient` and `APIUploadClient`.
 public final class AlamofireClient: APIClient, APIUploadClient, @unchecked Sendable {
