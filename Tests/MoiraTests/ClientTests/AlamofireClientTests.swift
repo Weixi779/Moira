@@ -1,5 +1,6 @@
 import Alamofire
 import Foundation
+import MoiraAlamofire
 import Testing
 @testable import Moira
 
