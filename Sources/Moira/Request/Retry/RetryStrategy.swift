@@ -1,4 +1,4 @@
-/// Defines retry behavior for transport and raw response processing failures.
+/// Defines retry behavior for transport and raw response validation failures.
 public protocol RetryStrategy: Sendable {
     /// Decides whether to retry after a failure.
     func shouldRetry(snapshot: RequestContext.Snapshot, error: Error) async -> RetryDecision

@@ -4,11 +4,14 @@ import Foundation
 public struct PluginRunner: Sendable {
     /// Transform plugins applied in order.
     public let transformPlugins: [TransformPlugin]
+    /// Response validation plugins applied in order.
+    public let responseValidationPlugins: [ResponseValidationPlugin]
     /// Observer plugins executed concurrently.
     public let observerPlugins: [ObserverPlugin]
 
     public init(plugins: [any RequestPlugin]) {
         self.transformPlugins = plugins.compactMap { $0 as? TransformPlugin }
+        self.responseValidationPlugins = plugins.compactMap { $0 as? ResponseValidationPlugin }
         self.observerPlugins = plugins.compactMap { $0 as? ObserverPlugin }
     }
 }
@@ -30,13 +33,14 @@ extension PluginRunner: TransformPlugin {
         }
         return adapted
     }
+}
 
-    public func processResponse(_ response: APIResponse) async throws -> APIResponse {
-        var processed = response
-        for plugin in transformPlugins {
-            processed = try await plugin.processResponse(processed)
+extension PluginRunner: ResponseValidationPlugin {
+    /// Applies response validation plugins in order.
+    public func validateResponse(_ response: APIResponse) async throws {
+        for plugin in responseValidationPlugins {
+            try await plugin.validateResponse(response)
         }
-        return processed
     }
 }
 

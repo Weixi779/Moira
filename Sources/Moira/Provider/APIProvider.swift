@@ -26,14 +26,7 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
     /// Executes a request and returns the raw response.
     @discardableResult
     public func request(_ target: any APIRequest) async throws -> APIResponse {
-        do {
-            return try await executeRequest(target)
-        } catch {
-            if error is CancellationError {
-                throw error
-            }
-            throw Self.mapToAPIError(error)
-        }
+        try await executeRequest(target)
     }
 
     /// Executes a request and decodes the response using the default decoder.
@@ -56,19 +49,12 @@ public final class APIProvider: APIProviding, @unchecked Sendable {
 
     /// Returns an upload task with progress for the raw response.
     public func uploadTask(_ target: any APIRequest) async throws -> UploadTask<APIResponse> {
-        do {
-            let pipeline = try await preparePipeline(for: target)
+        let pipeline = try await preparePipeline(for: target)
 
-            guard case let .upload(source) = pipeline.prepared.execution else {
-                throw APIError.invalidRequest("uploadTask requires execution == .upload.")
-            }
-            return try await executeUpload(source: source, request: pipeline.request, context: pipeline.context)
-        } catch {
-            if error is CancellationError {
-                throw error
-            }
-            throw Self.mapToAPIError(error)
+        guard case let .upload(source) = pipeline.prepared.execution else {
+            throw APIError.invalidRequest("uploadTask requires execution == .upload.")
         }
+        return try await executeUpload(source: source, request: pipeline.request, context: pipeline.context)
     }
 
     /// Returns an upload task with progress that decodes the response body.
@@ -193,24 +179,18 @@ private extension APIProvider {
         }
     }
 
-    /// Performs the actual transport and successful response handling for a built request.
+    /// Performs the actual transport and successful response validation for a built request.
     func sendRequest(_ request: URLRequest, context: RequestContext) async throws -> APIResponse {
         let response = try await client.request(request)
-        let processed = try await processResponse(response, context: context)
+        try await validateResponse(response, context: context)
         await notifyDidReceive(context: context)
-        return processed
+        return response
     }
 
-    /// Applies response transforms and stores the response in context.
-    func processResponse(_ response: APIResponse, context: RequestContext) async throws -> APIResponse {
-        do {
-            let processed = try await runner.processResponse(response)
-            await context.updateResponse(processed)
-            return processed
-        } catch {
-            await context.updateResponse(response)
-            throw error
-        }
+    /// Stores and validates the raw response.
+    func validateResponse(_ response: APIResponse, context: RequestContext) async throws {
+        await context.updateResponse(response)
+        try await runner.validateResponse(response)
     }
 
     /// Notifies observers before sending a request.
@@ -267,9 +247,9 @@ private extension APIProvider {
             }
             do {
                 let response = try await task.response()
-                let processed = try await self.processResponse(response, context: context)
+                try await self.validateResponse(response, context: context)
                 await self.notifyDidReceive(context: context)
-                return processed
+                return response
             } catch {
                 await context.updateError(error)
                 if let response = Self.response(from: error) {
@@ -287,14 +267,6 @@ private extension APIProvider {
         let built = try builder.build(prepared)
         let adapted = try await runner.adaptRequest(built)
         return (prepared, adapted)
-    }
-
-    /// Ensures errors are surfaced as `APIError`.
-    static func mapToAPIError(_ error: Error) -> APIError {
-        if let apiError = error as? APIError {
-            return apiError
-        }
-        return .underlying(error, response: nil)
     }
 
     static func response(from error: Error) -> APIResponse? {
