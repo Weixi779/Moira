@@ -52,7 +52,7 @@ struct UpdateProfile: Encodable, Sendable {
 ```swift
 let baseURL = URL(string: "https://api.example.com")!
 let builder = URLRequestBuilder(baseURL: baseURL)
-let provider = APIProvider(client: AlamofireClient(), builder: builder)
+let provider = APIProvider(client: URLSessionClient(), builder: builder)
 ```
 
 ## Configure retry
@@ -65,7 +65,7 @@ struct DefaultRetryStrategy: RetryStrategy {
 }
 
 let provider = APIProvider(
-    client: AlamofireClient(),
+    client: URLSessionClient(),
     builder: builder,
     retryStrategy: DefaultRetryStrategy()
 )

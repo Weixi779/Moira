@@ -3,6 +3,8 @@
 Client 是传输执行层。
 `APIClient` 是基础请求能力，`APIUploadClient` 是可选上传能力。
 
+`Moira` 提供 Foundation-only 的 `URLSessionClient`。`MoiraAlamofire` 是单独的 product，提供 `AlamofireClient`。
+
 ## APIClient
 
 ```swift
@@ -23,6 +25,16 @@ public protocol APIUploadClient: Sendable {
 
 `AlamofireClient` 将 Alamofire 同时适配到 `APIClient` 和 `APIUploadClient`。
 如果需要核心 URLSession 路径之外更稳定成熟的传输层扩展能力，例如更完整的上传行为或 Alamofire 成熟的请求生命周期能力，优先使用 Alamofire-backed 实现，或者提供自己的 `APIClient` / `APIUploadClient` 实现。
+
+```swift
+import Moira
+import MoiraAlamofire
+
+let provider = APIProvider(
+    client: AlamofireClient(),
+    builder: URLRequestBuilder(baseURL: baseURL)
+)
+```
 
 ## URLSessionClient
 
