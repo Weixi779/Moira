@@ -40,7 +40,7 @@ enum APIProviderTestSupport {
         }
     }
 
-    final class MockClient: APIClient {
+    final class MockClient: APIClient, APIUploadClient, @unchecked Sendable {
         private(set) var requestCount = 0
         private(set) var uploadCount = 0
         private let handler: @Sendable (URLRequest) async throws -> APIResponse
@@ -62,6 +62,14 @@ enum APIProviderTestSupport {
             return UploadTask(progress: stream) {
                 try await handler(request)
             }
+        }
+    }
+
+    struct RequestOnlyClient: APIClient {
+        let handler: @Sendable (URLRequest) async throws -> APIResponse
+
+        func request(_ request: URLRequest) async throws -> APIResponse {
+            try await handler(request)
         }
     }
 

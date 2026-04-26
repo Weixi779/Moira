@@ -156,6 +156,25 @@ struct APIProviderUploadTests {
         }
     }
 
+    @Test("uploadTaskThrowsCapabilityNotSupportedForRequestOnlyClient")
+    func uploadTaskThrowsCapabilityNotSupportedForRequestOnlyClient() async {
+        let client = Support.RequestOnlyClient { _ in Support.makeResponse() }
+        let provider = APIProvider(client: client, builder: Support.makeBuilder())
+        let request = Support.SimpleRequest(
+            method: .post,
+            execution: .upload(.data(Data([0x01])))
+        )
+
+        let error = await #expect(throws: APIError.self) {
+            _ = try await provider.uploadTask(request)
+        }
+
+        guard case .capabilityNotSupported = error else {
+            Issue.record("Expected APIError.capabilityNotSupported for request-only client uploads.")
+            return
+        }
+    }
+
     @Test("uploadWithNonEmptyBodyThrowsInvalidRequest")
     func uploadWithNonEmptyBodyThrowsInvalidRequest() async {
         let client = Support.MockClient { _ in Support.makeResponse() }
