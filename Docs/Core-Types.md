@@ -148,6 +148,7 @@ public enum APIError: Error, Sendable {
     case responseDecodingFailed(Error)
     case underlying(Error, response: APIResponse?)
     case invalidRequest(String)
+    case capabilityNotSupported(String)
 }
 ```
 
@@ -155,11 +156,21 @@ Callers should not assume every `APIProvider` failure is an `APIError`. Plugin, 
 
 `invalidRequest` is thrown when a request violates model constraints, such as an upload request with a non-empty `payload.body`.
 
+`capabilityNotSupported` is thrown when the configured client/provider does not support a requested capability, such as uploads on a request-only client.
+
 ## APIProviding
 
 High-level interface for executing requests.
 
 ```swift
+public protocol APIClient: Sendable {
+    func request(_ request: URLRequest) async throws -> APIResponse
+}
+
+public protocol APIUploadClient: Sendable {
+    func upload(_ request: URLRequest, source: UploadSource) throws -> UploadTask<APIResponse>
+}
+
 public protocol APIRequesting: Sendable {
     @discardableResult
     func request(_ target: any APIRequest) async throws -> APIResponse
@@ -173,6 +184,8 @@ public protocol APIUploading: Sendable {
 
 public protocol APIProviding: APIRequesting, APIUploading {}
 ```
+
+`APIClient` is request-only. Upload support is modeled separately by `APIUploadClient`. `APIProvider.uploadTask` requires the configured client to support `APIUploadClient`; otherwise it throws `APIError.capabilityNotSupported`.
 
 ## UploadTask
 

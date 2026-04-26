@@ -148,6 +148,7 @@ public enum APIError: Error, Sendable {
     case responseDecodingFailed(Error)
     case underlying(Error, response: APIResponse?)
     case invalidRequest(String)
+    case capabilityNotSupported(String)
 }
 ```
 
@@ -155,11 +156,21 @@ public enum APIError: Error, Sendable {
 
 `invalidRequest` 在请求违反模型约束时抛出，例如上传请求同时携带非空 `payload.body`。
 
+`capabilityNotSupported` 在当前配置的 client/provider 不支持被请求能力时抛出，例如 request-only client 上调用上传。
+
 ## APIProviding
 
 请求执行的上层接口。
 
 ```swift
+public protocol APIClient: Sendable {
+    func request(_ request: URLRequest) async throws -> APIResponse
+}
+
+public protocol APIUploadClient: Sendable {
+    func upload(_ request: URLRequest, source: UploadSource) throws -> UploadTask<APIResponse>
+}
+
 public protocol APIRequesting: Sendable {
     @discardableResult
     func request(_ target: any APIRequest) async throws -> APIResponse
@@ -173,6 +184,8 @@ public protocol APIUploading: Sendable {
 
 public protocol APIProviding: APIRequesting, APIUploading {}
 ```
+
+`APIClient` 只表示普通请求能力。上传能力由 `APIUploadClient` 单独建模。`APIProvider.uploadTask` 需要当前配置的 client 支持 `APIUploadClient`；否则会抛出 `APIError.capabilityNotSupported`。
 
 ## UploadTask
 
