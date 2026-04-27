@@ -1,6 +1,7 @@
 # 文档导航
 
 - 快速开始：`Docs/zh/Getting-Started.md`
+- 迁移指南：`Docs/zh/Migration-Guide.md`
 - 核心类型：`Docs/zh/Core-Types.md`
 - 插件体系：`Docs/zh/Plugins.md`
 - 请求构建：`Docs/zh/Request-Building.md`

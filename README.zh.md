@@ -23,7 +23,7 @@ Moira 是这次迁移后的落地选择：
 
 - 请求描述：`APIRequest` + `RequestPayload`
 - 规则稳定的请求构建：`URLRequestBuilder`
-- 插件体系：Transform / Observer / Retry
+- 生命周期扩展：Transform / ResponseValidation / Observer / RetryStrategy
 - 默认解码：`ResponseDecoder`
 - 上传与进度：`UploadTask<APIResponse>`
 
@@ -165,6 +165,7 @@ Moira 内置了完整的中英文文档，方便快速落地与深度扩展。
 - 中文文档索引：`Docs/zh/index.md`
 
 核心文档：
+- 迁移指南：`Docs/Migration-Guide.md` / `Docs/zh/Migration-Guide.md`
 - 快速开始：`Docs/Getting-Started.md` / `Docs/zh/Getting-Started.md`
 - 核心类型：`Docs/Core-Types.md` / `Docs/zh/Core-Types.md`
 - 插件体系：`Docs/Plugins.md` / `Docs/zh/Plugins.md`

@@ -1,6 +1,7 @@
 # Documentation Index
 
 - Getting Started: `Docs/Getting-Started.md`
+- Migration Guide: `Docs/Migration-Guide.md`
 - Core Types: `Docs/Core-Types.md`
 - Plugins: `Docs/Plugins.md`
 - Request Building: `Docs/Request-Building.md`

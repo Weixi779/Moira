@@ -23,7 +23,7 @@ Design background: [「iOS」网络层工程范式迁移](https://weixi779.githu
 
 - Request description: `APIRequest` + `RequestPayload`
 - Predictable build rules: `URLRequestBuilder`
-- Pluggable lifecycle: Transform / Observer / Retry
+- Pluggable lifecycle: Transform / ResponseValidation / Observer / RetryStrategy
 - Default decoding via `ResponseDecoder`
 - Upload with progress via `UploadTask<APIResponse>`
 
@@ -164,6 +164,7 @@ Index:
 - Chinese docs index: `Docs/zh/index.md`
 
 Core docs:
+- Migration Guide: `Docs/Migration-Guide.md` / `Docs/zh/Migration-Guide.md`
 - Getting Started: `Docs/Getting-Started.md` / `Docs/zh/Getting-Started.md`
 - Core Types: `Docs/Core-Types.md` / `Docs/zh/Core-Types.md`
 - Plugins: `Docs/Plugins.md` / `Docs/zh/Plugins.md`
